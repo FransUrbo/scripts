@@ -7,13 +7,13 @@ AFSCELL="bayour.com"
 
 # --------------
 # 'Initialize' AFS access...
-if ! tokens | grep -q ^User; then
-    ID=`id -u`
-    if [ "$ID" != "0" ]; then
-	echo "You must have a valid AFS token to do a backup (or be root)." > /dev/stderr
+ID=`id -u`
+if [ "$ID" = "0" ]; then
+    LOCALAUTH="-localauth"
+else
+    if ! tokens | grep -q ^User; then
+	echo "You must have a valid AFS token (or be root)." > /dev/stderr
 	exit 1
-    else
-	LOCALAUTH="-localauth"
     fi
 fi
 
