@@ -126,8 +126,9 @@ while(! eof(STDIN) ) {
 	# If this is the first delivery, we need to
 	# remember the date and time for this
 	if(! $first) {
-	    $first = `echo $begin{$msgnr} | /usr/local/bin/tailocal`;
-	    chomp($first);
+	    ($time1, $time2) = split(' ', $line);
+	    $time2 = (split('\.', $time2))[0];
+	    $first = "$time1 $time2";
 	}
 
 	$deliveries{'LOCAL'}++;
