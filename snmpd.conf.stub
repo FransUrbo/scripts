@@ -1,0 +1,3 @@
+## http://forums.cacti.net/about302-0-asc-15.html
+## snmpwalk -On -c public aurora .1.3.6.1.4.1.2021.80
+pass .1.3.6.1.4.1.8767.2.1           /etc/snmp/bind9-snmp-stats.pl
