@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.9 2002-10-09 05:01:57 turbo Exp $
+# $Id: backup_afs.sh,v 1.10 2002-10-13 08:32:17 turbo Exp $
 
 cd /
 
@@ -199,10 +199,19 @@ do_backup () {
 	    fi
 
 	    if echo $RES | grep -q 'Dumped volume'; then
+		# DUMP OK
+
 		RES=`echo $RES | sed 's@.* /@/@'`
 		[ ! -z "$verbose" ] && echo "$RES"
 	    elif echo $RES | grep -q 'VLDB: vldb entry is already locked'; then
+		# DUMP FAILED - vldb locked
+
 		vos unlock $volume -localauth > /dev/null 2>&1
+		dump_volume $volume $BACKUPFILE
+	    elif echo $RES | grep -q 'Volume needs to be salvaged'; then
+		# DUMP FAILED - salvage volume
+
+		bos salvage -server ${AFSSERVER:-localhost} -partition $PART -volume $volume -localauth
 		dump_volume $volume $BACKUPFILE
 	    fi
 
