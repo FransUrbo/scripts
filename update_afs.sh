@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: update_afs.sh,v 1.4 2002-08-29 09:16:41 turbo Exp $
+# $Id: update_afs.sh,v 1.5 2002-08-29 13:57:03 turbo Exp $
 
 cd /
 
@@ -23,7 +23,7 @@ fi
 
 # --------------
 # Get the CLI options...
-VOLUMES="" ; TEMP=`getopt -o hupcv --long help,users,public,common,verbose -- "$@"`
+VOLUMES="" ; TEMP=`getopt -o hupcvt --long help,users,public,common,verbose,test -- "$@"`
 eval set -- "$TEMP"
 while true ; do
     case "$1" in
@@ -34,15 +34,17 @@ while true ; do
 	    echo "	 -p,--public		Release only the public.* volumes"
 	    echo "	 -c,--common		Release only the common.* volumes"
 	    echo "	 -v,--verbose		Explain what's being done"
+	    echo "	 -t,--test		Get volumes, but don't relase them"
 	    echo "If volume is given, only release that/those volumes."
 	    echo "If no option and no volume is given, backup all replicated volumes."
 	    echo 
 	    exit 0
 	    ;;
-	-c|--common)		VOLUMES="common" ; shift ;;
-	-u|--users)		VOLUMES="user"   ; shift ;;
-	-p|--public)		VOLUMES="public" ; shift ;;
-	-v|--verbose)		verbose=1        ; shift ;;
+	-c|--common)		search="$search common" ; shift ;;
+	-u|--users)		search="$search user"   ; shift ;;
+	-p|--public)		search="$search public" ; shift ;;
+	-v|--verbose)		verbose=1 ; shift ;;
+	-t|--test)		test=1	  ; shift ;;
 	--)			shift ; [ -z "$VOLUMES" ] && VOLUMES="$*" ; break ;; 
 	*)			echo "Internal error!" ; exit 1 ;;
     esac
@@ -50,14 +52,23 @@ done
 
 # --------------
 # Get volumes for backup
-if [ "$VOLUMES" != "" ]; then
-    VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH | grep "^$VOLUMES\..*\.readonly" | sed -e 's@\ .*@@' -e 's@\.readonly@@'`
+if [ "$search" != "" ]; then
+    # Build a nice regexp for the volumes to search for.
+    search="^(`echo $search | sed -e 's@ @\\\..*\\\.readonly|^@' -e 's@\$@\\\..*\\\.readonly@'`).*RO.*"
+
+    # Get all the volumes contain the search criteria
+    VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH | egrep "$search" | sed -e 's@\.readonly.*@@'`
 else
     if [ -z "$VOLUMES" ]; then
 	VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH | grep readonly | sed -e 's@\ .*@@' -e 's@\.readonly@@'`
     fi
 fi
 VOLUMES=`echo $VOLUMES`
+
+if [ ! -z "$test" ]; then
+    echo "Volumes to release: $VOLUMES"
+    exit 0
+fi
 
 for vol in $VOLUMES; do
     [ ! -z "$verbose" ] && echo -n "Releasing volume: $vol"
