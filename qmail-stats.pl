@@ -21,16 +21,26 @@ sub get_time {
 
 # Get options to command
 if($ARGV[0]) {
-    foreach $arg (@ARGV) {
+    for($i=0; $ARGV[$i]; $i++) {
+	$arg = $ARGV[$i];
+
 	$allstats=1 if($arg eq '--all');
 	$DEBUG=1 if($arg eq '--debug');
 	$emails=1 if(($arg eq '--emails') || ($arg eq '--all'));
+	$quiet=1 if($arg eq '--quiet');
+
 	if($arg eq '--help') {
 	    print "Usage: `basename $0` [options]\n";
-	    print "       --all      Show information of each deliver (start, end, recipient etc)\n";
-	    print "       --debug    Only do the first 100 lines in the file\n";
-	    print "       --emails   Show number of deliveries to each email address\n";
+	    print "       --all                  Show information of each deliver (start, end, recipient etc)\n";
+	    print "       --debug                Only do the first 100 lines in the file\n";
+	    print "       --emails               Show number of deliveries to each email address\n";
+	    print "       --domain [domain.tld]  Output statistics for domain.tld only\n";
+	    print "       --quiet                Output one line with 'received sent bounce' values\n";
 	    exit(0);
+	}
+
+	if($arg eq '--domain') {
+	    $i++; $DOMAIN = $ARGV[$i]; 
 	}
     }
 }
@@ -38,19 +48,15 @@ if($ARGV[0]) {
 $hostname = `hostname`;
 chomp($hostname);
 
-$i=0;
+$i = $bounce = $remote = 0; 
 while(! eof(STDIN) ) {
     $line = <STDIN>; chomp($line);
 
-# ----------------
-#2002-09-17 06:35:15.334422 starting delivery 1: msg 16799625 to local turbo@bayour.com
-#2002-09-17 06:35:23.327073 delivery 1: success: did_1+0+0/
-#
-#1032237315.334422 starting delivery 1: msg 16799625 to local turbo@bayour.com
-#1032237323.327073 delivery 1: success: did_1+0+0/
-# ----------------
-
     if($line =~ / starting delivery .*:.* to local /) {
+	# 1032237315.334422 starting delivery 1: msg 16799625 to local turbo@bayour.com
+	#
+	# 2002-09-17 06:35:15.334422 starting delivery 1: msg 16799625 to local turbo@bayour.com
+
 	# Get the msg number
 	if($line =~ /^20[0-9][0-9]-.*/) {
 	    # Human readable
@@ -110,10 +116,36 @@ while(! eof(STDIN) ) {
 	# If this is the first delivery, we need to
 	# remember the date and time for this
 	if(! $first) {
-	    $first = `echo $begin{$msgnr} | tailocal`;
+	    $first = `echo $begin{$msgnr} | /usr/local/bin/tailocal`;
 	    chomp($first);
 	}
+    } elsif($line =~ / starting delivery .*:.* to remote /) {
+	# 2003-05-28 00:19:39.449583 starting delivery 2478: msg 161215 to remote baby6@3333.3utilities.com
+	#
+	# 1054100604.173939 starting delivery 100: msg 161212 to remote 9l2zrhnxlifz@loyus.com
+	# Get the msg number
+	if($line =~ /^20[0-9][0-9]-.*/) {
+	    # Human readable
+	    $msgnr =  (split(' ', $line))[4];
+	} else {
+	    # Unix std time
+	    $msgnr =  (split(' ', $line))[3];
+	}
+	$msgnr =~ s/:$//;
+	next if(!$msgnr);
+
+	$remote{'TOP'}++; $remote{$domain}++ if($domain);
+    } elsif($line =~ / delivery .*: deferral: /) {
+	# 2003-05-28 00:37:24.417470 delivery 2518: deferral: Sorry,_I_couldn't_find_any_host_by_that_name._(#4.1.2)/
+	# Failed delivery
+
+	$remote{'TOP'}--; $remote{$domain}-- if($domain);
+	$bounce{'TOP'}++; $bounce{$domain}++ if($domain);
     } elsif($line =~ / delivery .*: success: did/) {
+	# 1054096268.233525 delivery 2: success: did_0+0+1/
+	#
+	# 2003-05-28 00:20:28.052708 delivery 2479: success: did_0+0+1/
+
 	# Get the msg number
 	if($line =~ /^20[0-9][0-9]-.*/) {
 	    # Human readable
@@ -139,21 +171,22 @@ while(! eof(STDIN) ) {
 	    goto LOOP;
 	}
     }
+
     $i++ if($DEBUG);
 }
 exit(0) if(!$msgnr); # We have no statistics - exit
 
 LOOP:
     # Remember the last entry
-    $last = `echo $end{$msgnr} | tailocal`;
+    $last = `echo $end{$msgnr} | /usr/local/bin/tailocal`;
     chomp($last);
 
     $high = 0; $i = 0; $avg = 0;
 
     foreach $nr (sort { $begin{$a} <=> $begin{$b} } keys(%begin)) {
 	# Get start and end time of delivery
-	$time1 = `echo $begin{$nr} | tailocal`;
-	$time2 = `echo $end{$nr}   | tailocal` if($end{$nr});
+	$time1 = `echo $begin{$nr} | /usr/local/bin/tailocal`;
+	$time2 = `echo $end{$nr}   | /usr/local/bin/tailocal` if($end{$nr});
 	chomp($time1); chomp($time2);
 	
 	# How long did the delivery take?
@@ -164,28 +197,61 @@ LOOP:
 	$avg   = $avg + $time3;
 	
 	printf("%5d: $time1 - $time2 (%3d sec) -> $dest{$nr}\n", $nr, $time3)
-	    if($allstats);
+	    if($allstats && !$quiet);
 	$i++;
     }
 
     # Output the statistics
-    print "\n" if($allstats);
-    print "Status between '$first' and '$last'\n";
-    printf("Highest time of delivery:           %5d\n", $high);
-    printf("Average delivery time:              %5d\n", $avg/$i);
-    printf("Number of deliveries:               %5d\n\n", $i);
+    if(!$quiet) {
+	print "\n" if($allstats);
+	print "Status between '$first' and '$last'\n";
+	printf("Highest time of delivery:           %5d\n", $high);
+	printf("Average delivery time:              %5d\n", $avg/$i);
+	print "\n";
+
+	if(!$DOMAIN) {
+	    printf("Number of LOCAL deliveries:         %5d\n", $i);
+	    printf("Number of REMOTE deliveries:        %5d\n", $remote{'TOP'});
+	    printf("Bounces or failed deliveries:       %5d\n", $bounce{'TOP'});
+	} else {
+	    printf("Number of LOCAL deliveries:         %5d\n", $delivery{$DOMAIN}->{'TOP'});
+	    printf("Number of REMOTE deliveries:        %5d\n", $remote{$DOMAIN});
+	    printf("Bounces or failed deliveries:       %5d\n", $bounce{$DOMAIN});
+	}
+	print "\n";
+    }
 
     if($emails) {
-	foreach $domain (sort keys(%delivery)) {
-	    printf("Domain: %-27s %5d\n", $domain, $delivery{$domain}->{'TOP'});
-
-	    # Dereference the two-dimensional array.
-	    foreach $recip (sort keys(%{ $delivery{$domain} })) {
-		if($recip ne 'TOP') {
-		    printf("        %-27s %5d\n", $recip, $delivery{$domain}->{$recip});
+	if($DOMAIN) {
+	    if($quiet) {
+		# in out bounce
+		print "$delivery{$DOMAIN}->{'TOP'} $remote{$DOMAIN} $bounce{$DOMAIN}";
+	    } else {
+		printf("Domain: %-27s %5d\n", $DOMAIN, $delivery{$DOMAIN}->{'TOP'});
+		
+		# Dereference the two-dimensional array.
+		foreach $recip (sort keys(%{ $delivery{$DOMAIN} })) {
+		    if($recip ne 'TOP') {
+			printf("        %-27s %5d\n", $recip, $delivery{$DOMAIN}->{$recip});
+		    }
+		}
+		
+		print "\n";
+	    }
+	} else {
+	    if(!$quiet) {
+		foreach $domain (sort keys(%delivery)) {
+		    printf("Domain: %-27s %5d\n", $domain, $delivery{$domain}->{'TOP'});
+		    
+		    # Dereference the two-dimensional array.
+		    foreach $recip (sort keys(%{ $delivery{$domain} })) {
+			if($recip ne 'TOP') {
+			    printf("        %-27s %5d\n", $recip, $delivery{$domain}->{$recip});
+			}
+		    }
+		    
+		    print "\n";
 		}
 	    }
-
-	    print "\n";
 	}
     }
