@@ -31,7 +31,7 @@ if [ ! -z "$1" ]; then
 		exit 0
 		;;
 	    -f|--noformat)	NOFORMAT=1 ; shift ;;
-	    --)			shift ; VOLUMES="$*" ; break ;; 
+	    --)			shift ; AFSSERVER="$1" ; break ;; 
 	    *)			echo "Internal error!" ; exit 1 ;;
 	esac
     done
@@ -45,6 +45,9 @@ PARTITIONS="$*"
 for part in $PARTITIONS; do
     set -- `mount | grep $part`
     dev="$1"
+    if [ -z "$dev" ]; then
+	dev="[remote]"
+    fi
 
     echo 0 > $TMPFILE
 
