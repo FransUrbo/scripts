@@ -1,0 +1,36 @@
+# -----------------
+# Backup the AFS volumes
+if [ -x /usr/local/sbin/backup_afs.sh ]; then
+    echo "Starting AFS volume backup at" `date +"%Y%m%d %H:%M:%S"`
+ 
+    ODD=`expr \`date +"%V"\` % 2`
+ 
+    # Do we backup odd or even weeks?
+    if [ "$DAY" = "1" -o "$BACKUP_TYPE" == "full" ]; then
+        # This is a monday (or we've specified full backup), clean
+        # the backup directory. We'll have PREVIOUS weeks backup(s)
+        # intact -> At least one weeks of backup(s) online.
+ 
+# Unfortunatly I don't have enough space on my backup partition
+# to save two full weeks, therefor I'm deleting ALL backups, and
+# start over. HOPFULLY it's saved to tape by now...
+#
+# If you HAVE enough room for two full weeks, uncomment the if/else/fi
+# lines below.
+#       if [ "$ODD" != "1" ]; then
+            # Odd weeks
+            rm -f $BACKUPVOLDIR/odd/*
+#       else
+            # Even weeks
+            rm -f $BACKUPVOLDIR/even/*
+#       fi
+ 
+        # Do a FULL backup
+        /usr/local/sbin/backup_afs.sh 2>&1
+    else
+        # Do a INCREMENTAL volume backup
+        /usr/local/sbin/backup_afs.sh -i 2>&1
+    fi
+ 
+    echo "Ending AFS volume backup at" `date +"%Y%m%d %H:%M:%S"`
+fi
