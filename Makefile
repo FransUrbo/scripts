@@ -1,7 +1,7 @@
-# $Id: Makefile,v 1.17 2003-10-20 19:38:23 turbo Exp $
+# $Id: Makefile,v 1.18 2003-10-29 07:58:30 turbo Exp $
 
 sBINARIES="backup_afs.sh update_afs.sh salvage_afs.sh qmail-runq qmail-stats.pl"
-uBINARIES="df_afs.pl list_afs_vols.sh"
+uBINARIES="df_afs.pl list_afs_vols.sh idn.sh"
 
 install all:	clean
 	@(cp -v backup /sbin/backup-`hostname`; \
