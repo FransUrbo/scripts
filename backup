@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.16 2003-02-14 17:17:14 turbo Exp $
+# $Id: backup,v 1.17 2003-03-01 09:57:44 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -86,8 +86,7 @@ mkdir /tmp/$$ && chmod 700 /tmp/$$ && ( \
     find kerberos openldap | cpio -p /tmp/$$ 2> /dev/null; \
     cd /afs/bayour.com/user/fredriksson/turbo/secret && \
     mkdir /tmp/$$/Implementing_LDAPv3 && \
-    find Implementing_LDAPv3.sdw LDAPv3 LDAPv3 | cpio -vp \
-    /tmp/$$/Implementing_LDAPv3 2> /dev/null; \
+    find LDAPv3 | cpio -vp /tmp/$$/Implementing_LDAPv3 2> /dev/null; \
     cd /var/www/bayour/secret.old/LDAPv3/Softwares && \
     find -type f -exec ls -ln {} \; > /tmp/$$/LDAPv3_install.filelist; \
 ) && cd /tmp/$$ && tar cjpsf $BACKUPFILE6 . && rm -R /tmp/$$
