@@ -1,6 +1,4 @@
-# $Id: Makefile,v 1.5 2002-11-10 10:45:34 turbo Exp $
-
-TMPFILE = $(shell tempfile -p bkp.)
+# $Id: Makefile,v 1.6 2002-11-10 10:55:26 turbo Exp $
 
 install all:	clean
 	@( \
@@ -10,8 +8,10 @@ install all:	clean
 	)
 	@for host in rmgztk morwen ; do \
 	  echo -n "backup-rmgztk_morwen -> $$host:/sbin/backup-$$host... "; \
-	  sed -e "s@%DIRS%@`cat .dirs-$$host`@" backup-rmgztk_morwen > $TMPFILE; \
-	  rcp -x $TMPFILE root@$$host:/sbin/backup-$$host; \
+	  sed -e "s@%DIRS%@`cat .dirs-$$host`@" backup-rmgztk_morwen \
+	      -e "s@%HOST%@$$host@" > .TMPFILE; \
+	  rcp -x .TMPFILE root@$$host:/sbin/backup-$$host; \
+	  rm .TMPFILE; \
 	  echo "done."; \
 	done
 
