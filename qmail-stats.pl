@@ -140,7 +140,7 @@ while(! eof(STDIN) ) {
 	   ($recip =~ /.*-request\@.*/) || ($recip =~ /.*-subscribe.*/) ||
 	   ($recip =~ /.*-faq\@.*/) || ($recip =~ /.*-help.*\@.*/) || 
 	   ($recip =~ /.*-return.*\@.*/) || ($recip =~ /.*-info\@.*/) ||
-	   ($recip =~ /.*-index.*) | ($recip =~ /.*-unsubscribe-.*/))
+	   ($recip =~ /.*-index.*/) | ($recip =~ /.*-unsubscribe-.*/))
 	{
 	    $recip =~ s!-.*\@!\@!;
 	}
