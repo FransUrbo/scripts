@@ -1,22 +1,26 @@
 #!/bin/sh
 
-# $Id: backup-rmgztk_morwen,v 1.6 2002-09-15 14:41:05 turbo Exp $
+# $Id: backup-rmgztk_morwen,v 1.7 2002-09-24 06:50:23 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
-BACKUPDIR=/var/.backups && mkdir $BACKUPDIR/$DATE
+BACKUPDIR=/var/.backups
+HOSTNAME=`hostname`
 
-BACKUPDIR=$BACKUPDIR/$DATE
-BACKUPFILE1=$BACKUPDIR/confs-$DATE.tar.bz2
-BACKUPFILE2=$BACKUPDIR/slapd-$DATE.ldif.bz2
-BACKUPFILE3=$BACKUPDIR/krb5-$DATE
+BACKUPFILE1=$BACKUPDIR/System/$HOSTNAME-confs-$DATE.tar.bz2
+BACKUPFILE2=$BACKUPDIR/OpenLDAP/$HOSTNAME-slapd-$DATE.ldif.bz2
+BACKUPFILE3=$BACKUPDIR/KerberosV/$HOSTNAME-krb5-$DATE
 BACKUPFILE5=/etc/dpkg/selections-$DATE
-BACKUPFILE7=$BACKUPDIR/oldlogs-$DATE.tar.bz2
+BACKUPFILE7=$BACKUPDIR/Logs/$HOSTNAME-oldlogs-$DATE.tar.bz2
 
 BACKUPFILES="$BACKUPFILE1 $BACKUPFILE2 $BACKUPFILE3.bz2 $BACKUPFILE7"
 
-BIGBACKUP=backups-`hostname`-$DATE.tar
-
 cd /
+
+# Make sure the directoris exists.
+for file in $BACKUPFILES; do
+    dir=`dirname $file`
+    [ ! -x $dir ] && mkdir -p $dir
+done
 
 # ----- L D A P -----
 if [ -f /etc/init.d/slapd.backup ]; then
@@ -52,15 +56,17 @@ tar cjpsf $BACKUPFILE1 `find etc/ldap etc/krb5* \
 # Logfiles...
 cd /var/log && tar --remove-files -cjf $BACKUPFILE7 `find -name '*.gz'`
 
-# -----------------
-# Archive all the backups into ONE file
-cd $BACKUPDIR && tar --remove-files -cf ../$BIGBACKUP . \
-    && cd .. && rm -Rf $BACKUPDIR && chmod 600 $BIGBACKUP
-
 # Upload the backupfile to papadoc.
 kinit -l 4m -k -t /etc/krb5.keytab.backup backup@BAYOUR.COM
-rcp -D 2106 -x $BIGBACKUP backup@papadoc.bayour.com:/var/.backups/
-kdestroy
+for file in $BACKUPFILES; do
+    file=`echo $file | sed "s@$BACKUPDIR/@@"`
+    dir=`dirname $file` ; filename=`basename $file`
 
-# Remove the backup directory and the big backup file
-rm -f $BIGBACKUP
+    if rcp -D 2106 -x $BACKUPDIR/$file backup@papadoc.bayour.com:/var/.backups/$dir/; then
+	# Successfully uploaded file. Delete it, we don't have any free space!
+	echo -n "Deleting $file: "
+	rm $BACKUPDIR/$file
+	echo "done."
+    fi
+done
+kdestroy
