@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup-rmgztk_morwen,v 1.7 2002-09-24 06:50:23 turbo Exp $
+# $Id: backup-rmgztk_morwen,v 1.8 2002-09-24 06:51:29 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -64,9 +64,7 @@ for file in $BACKUPFILES; do
 
     if rcp -D 2106 -x $BACKUPDIR/$file backup@papadoc.bayour.com:/var/.backups/$dir/; then
 	# Successfully uploaded file. Delete it, we don't have any free space!
-	echo -n "Deleting $file: "
 	rm $BACKUPDIR/$file
-	echo "done."
     fi
 done
 kdestroy
