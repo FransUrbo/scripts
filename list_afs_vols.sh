@@ -41,15 +41,18 @@ fi
 set -- `vos listpart ${AFSSERVER:-localhost} | grep -v '^[A-Z]'`
 PARTITIONS="$*"
 for part in $PARTITIONS; do
+    set -- `mount | grep $part`
+    dev="$1"
+
     vos listvol ${AFSSERVER:-localhost} $part | grep '^[a-z]' | \
     while read line; do
 	set -- `echo $line`
 
 	# /vicepc  : user.jerry                     :  536871002 : RW :       10K : On-line
 	if [ -z "$NOFORMAT" ]; then
-	    printf "%-8s %-30s %10s %-2s %8d%s %s\n" $part $1 $2 $3 $4 $5 $6
+	    printf "%-10s %-8s %-30s %10s %-2s %8d%s %s\n" $dev $part $1 $2 $3 $4 $5 $6
 	else
-	    printf "%s:%s:%s:%s:%d%s:%s\n" $part $1 $2 $3 $4 $5 $6
+	    printf "%s;%s;%s;%s;%s;%d%s;%s\n" $dev $part $1 $2 $3 $4 $5 $6
 	fi
     done
 done
