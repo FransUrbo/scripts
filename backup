@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.22 2003-09-21 07:58:29 turbo Exp $
+# $Id: backup,v 1.23 2003-10-18 15:09:26 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -36,9 +36,11 @@ check_error () {
 # ----- A F S -----
 DIR=etc/openafs
 if [ -d "$DIR" ]; then
+    /usr/local/bin/list_afs_vols.sh -f > $DIR/volumes.txt
     cd /  && tar cjpf $BACKUPFILE4 \
 	$DIR/CellServDB $DIR/afs.conf* $DIR/ThisCell \
-	$DIR/server $DIR/cacheinfo var/lib/openafs/db/*.DB0
+	$DIR/server $DIR/cacheinfo $DIR/volumes.txt \
+	var/lib/openafs/db/*.DB0
     check_error "$?" "AFS database"
 fi
 
