@@ -1,0 +1,52 @@
+dn: uid=%UID%,ou=People,o=Bayour.COM,c=SE
+uid: %UID%
+cn: %FIRSTNAME% %LASTNAME%
+sn: %FIRSTNAME% %LASTNAME%
+mail: %UID%@bayour.com
+userPassword: {SASL}%UID%@BAYOUR.COM
+krb5PrincipalName: %UID%@BAYOUR.COM
+loginShell: /bin/bash
+uidNumber: %UIDNUMBER%
+gidNumber: %GIDNUMBER%
+gecos: %FIRSTNAME% %LASTNAME%
+mailHost: aurora.bayour.com
+trustModel: byserver
+accessTo: pumba.bayour.com
+objectClass: person
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: krb5Principal
+objectClass: mailRecipient
+objectClass: trustAccount
+mailQuota: 5000000S,10000C
+homeDirectory: /afs/bayour.com/user/users/%UID%
+mailMessageStore: /var/mail/users/%UID%
+OpenLDAPaci: 0#entry#grant;r,s,c;objectClass,[entry]#public#
+OpenLDAPaci: 1#entry#grant;x;userPassword#public#
+OpenLDAPaci: 2#entry#grant;x;krb5PrincipalName#public#
+OpenLDAPaci: 3#entry#grant;x;cn,mail,mailAlternateAddress#public#
+OpenLDAPaci: 4#entry#grant;s;userPassword,krb5PrincipalName,cn,mail,mailAltern
+ ateAddress#access-id#uid=proxy,ou=System,o=Bayour.COM,c=SE
+OpenLDAPaci: 5#entry#grant;r,s,c;uid,cn,accountStatus,uidNumber,gidNumber,geco
+ s,homeDirectory,loginShell,trustModel,accessTo,mailMessageStore#public#
+OpenLDAPaci: 6#entry#grant;r,s,c;mail,mailAlternateAddress,mailHost,mailQuotaS
+ ize,mailQuotaCount,accountStatus,deliveryMode,userPassword,mailMessageStore,d
+ eliveryProgramPath#access-id#uid=qmail,ou=System,o=Bayour.COM,c=SE
+OpenLDAPaci: 7#entry#grant;r,s,c;sn,givenName,homePostalAddress,mobile,homePho
+ ne,labeledURI,mailForwardingAddress,street,physicalDeliveryOfficeName,mailMes
+ sageStore,o,l,st,telephoneNumber,postalCode,title#users#
+OpenLDAPaci: 8#entry#grant;w,r,s,c;sn,givenName,homePostalAddress,mobile,homeP
+ hone,labeledURI,mailForwardingAddress,street,physicalDeliveryOfficeName,o,l,s
+ t,telephoneNumber,postalCode,title,deliveryMode,userPassword#self#
+OpenLDAPaci: 9#entry#grant;w,r,s,c,x;[all]#access-id#uid=turbo,ou=People,o=Fre
+ driksson,c=SE
+
+dn: cn=%UID%,ou=Groups,o=Bayour.COM,c=SE
+objectClass: posixGroup
+objectClass: top
+cn: %UID%
+gidNumber: %GIDNUMBER%
+OpenLDAPaci: 0#entry#grant;r,s,c;objectClass,[entry]#public#
+OpenLDAPaci: 1#entry#grant;r,s,c;cn,gidNumber,memberUid#public#
+OpenLDAPaci: 2#entry#grant;w,r,s,c,x;[all]#access-id#uid=turbo,ou=People,o=Fre
+ driksson,c=SE
