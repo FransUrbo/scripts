@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: update_afs.sh,v 1.6 2002-08-29 14:40:29 turbo Exp $
+# $Id: update_afs.sh,v 1.7 2002-08-30 05:05:09 turbo Exp $
 
 cd /
 
@@ -71,7 +71,7 @@ if [ ! -z "$test" ]; then
 fi
 
 for vol in $VOLUMES; do
-    if [ ! -z "$verbose" ]; fi
+    if [ ! -z "$verbose" ]; then
 	echo -n "Releasing volume: $vol"
 	vos release $vol $LOCALAUTH $verbose
     else
