@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.13 2002-10-28 14:28:38 turbo Exp $
+# $Id: backup_afs.sh,v 1.14 2002-10-28 14:31:50 turbo Exp $
 
 cd /
 
@@ -217,8 +217,13 @@ do_backup () {
 		    #Mon Oct 28 09:47:53 2002 1 Volser: Clone: The "recloned" volume must be a read only volume; aborted
 		    # FAILED - salvage volume
 
-		    echo "Trying to salvage the volume so we can try again"
-		    bos salvage -server ${AFSSERVER:-localhost} -partition $PART -volume $volume -localauth
+		    # Do the salvage TWICE (just to be safe)!
+		    i=0 ; while [ "$i" -lt 2 ]; do
+			echo "Trying to salvage the volume so we can try again"
+			bos salvage -server ${AFSSERVER:-localhost} -partition $PART -volume $volume -localauth
+
+			i=`expr $i + 1`
+		    done
 		fi
 
 		# Try to backup this volume later...
