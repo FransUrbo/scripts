@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.24 2003-10-10 10:26:34 turbo Exp $
+# $Id: backup_afs.sh,v 1.25 2003-10-21 05:55:34 turbo Exp $
 
 cd /
 
@@ -38,7 +38,7 @@ last_modified () {
 #	    Returns 1 if it have, 0 if not
 get_vol_mod () {
     # Examine volume - when was volume last modified?
-    local last=`vos examine $1 -localauth | grep 'Last Update' | sed 's@.*Update @@'`
+    local last=`vos examine $1 $LOCALAUTH | grep 'Last Update' | sed 's@.*Update @@'`
 
     # What's that in UNIX std format (seconds since Jan 1, 1970)?
     local modified=`date -d "$last" +"%s"`
@@ -77,7 +77,7 @@ get_vol_mnt () {
 # --------------
 # FUNCTION: Find the partition the volume is on
 get_vol_part () {
-    PART=`vos examine $1 -localauth | sed 1d | head -n1 | sed 's@.*/@/@'`
+    PART=`vos examine $1 $LOCALAUTH | sed 1d | head -n1 | sed 's@.*/@/@'`
     if [ -z "$PART" ]; then
 	# Could not find the partition, try again
 	PART=`vos examine $vol $LOCALAUTH | egrep 'server .* partition .* RW Site' | sed -e 's@.*/@/@' -e 's@ .*@@'`
@@ -96,7 +96,7 @@ get_vol_part () {
 # FUNCTION: Get the size of the volume
 get_vol_size () {
     SIZE=""
-    set -- `vos examine $1 -localauth | head -n1`
+    set -- `vos examine $1 $LOCALAUTH | head -n1`
     SIZE=$4
 }
 
@@ -133,13 +133,13 @@ create_backup_volume () {
     else
 	if [ -z "$action" ]; then
 	    if [ "$BACKUP_VOLUMES" -gt 0 ]; then
-		RES=`vos backup $volume -localauth 2>&1`
+		RES=`vos backup $volume $LOCALAUTH 2>&1`
 	    else
-		$action vos backup $volume -localauth
+		$action vos backup $volume $LOCALAUTH
 		RES="Created backup volume for $volume"
 	    fi
 	else
-	    $action vos backup $volume -localauth
+	    $action vos backup $volume $LOCALAUTH
 	    RES="Created backup volume for $volume"
 	fi
     fi
@@ -155,14 +155,14 @@ dump_volume () {
 
 	if [ ! -z "$action" ]; then
 	    RES=`$action vos dump -id $vol -server ${AFSSERVER:-localhost} \
-		-partition $PART $TIMEARG -localauth 2> /dev/null \| split -b1024m - $file. 2>&1`
+		-partition $PART $TIMEARG $LOCALAUTH 2> /dev/null \| split -b1024m - $file. 2>&1`
 	else
 	    RES=`vos dump -id $vol -server ${AFSSERVER:-localhost} \
-		-partition $PART $TIMEARG -localauth 2> /dev/null | split -b1024m - $file. 2>&1`
+		-partition $PART $TIMEARG $LOCALAUTH 2> /dev/null | split -b1024m - $file. 2>&1`
 	fi
     else
 	RES=`$action vos dump -id $vol -server ${AFSSERVER:-localhost} \
-	    -partition $PART $TIMEARG -file $file -localauth 2>&1`
+	    -partition $PART $TIMEARG -file $file $LOCALAUTH 2>&1`
     fi
 }
 
@@ -208,7 +208,7 @@ do_backup () {
 		    # FAIL: Volume database locked
 		    echo "Trying to unlock the volume so we can try again"
 		    
-		    vos unlock $volume -localauth > /dev/null 2>&1
+		    vos unlock $volume $LOCALAUTH > /dev/null 2>&1
 		    
 		    # Try to backup this volume later...
 		    MISSING_VOLUMES="$MISSING_VOLUMES $volume"
@@ -231,7 +231,7 @@ do_backup () {
 #			    # Restore the volume
 #			    $action vos restore -server ${AFSSERVER:-localhost} -partition vicepb \
 #				-name $volume -file $TMPFILE -id $volume -overwrite full \
-#				-localauth
+#				$LOCALAUTH
 #				
 #			    # Update the database
 #			    $action fs checkv
@@ -256,7 +256,7 @@ do_backup () {
 		    # ERROR
 		    # We might get the following error from this:
 		    #
-		    #[papadoc.root]# vos backup user.malin -localauth
+		    #[papadoc.root]# vos backup user.malin $LOCALAUTH
 		    #Could not re-clone backup volume 536871049
 		    #: Invalid argument
 		    #Error in vos backup command.
@@ -269,7 +269,7 @@ do_backup () {
 		    # Do the salvage TWICE (just to be safe)!
 		    i=0 ; while [ "$i" -lt 2 ]; do
 			echo "Trying to salvage the volume so we can try again"
-			bos salvage -server ${AFSSERVER:-localhost} -partition $PART -volume $volume -localauth
+			bos salvage -server ${AFSSERVER:-localhost} -partition $PART -volume $volume $LOCALAUTH
 			
 			i=`expr $i + 1`
 		    done
@@ -344,12 +344,12 @@ do_backup () {
 			# Remove the backup volume
 			if [ -z "$action" ]; then
 			    if [ "$BACKUP_VOLUMES" -gt 0 ]; then
-				vos remove -id $volume.backup -localauth > /dev/null 2>&1 &
+				vos remove -id $volume.backup $LOCALAUTH > /dev/null 2>&1 &
 			    else
-				$action vos remove -id $volume.backup -localauth
+				$action vos remove -id $volume.backup $LOCALAUTH
 			    fi
 			else
-			    $action vos remove -id $volume.backup -localauth
+			    $action vos remove -id $volume.backup $LOCALAUTH
 			fi
 		    fi
 		fi
@@ -411,23 +411,22 @@ done
 
 # --------------
 # 'Initialize' AFS access...
-if ! tokens | grep -q ^User; then
-    ID=`id -u`
-    if [ "$ID" != "0" ]; then
+if [ "$ID" = "0" ]; then
+    LOCALAUTH="-localauth"
+else
+    if ! tokens | grep -q ^User; then
 	echo "You must have a valid AFS token to do a backup (or be root)." > /dev/stderr
 	exit 1
-#    else
-#	LOCALAUTH="-localauth"
     fi
 fi
 
 # --------------
 # Get volumes for backup
 if [ "$VOLUMES" = "users" ]; then
-    VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet -localauth | grep ^user | egrep -v '^root|readonly|\.backup|\.rescue' | sed 's@\ .*@@'`
+    VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH | grep ^user | egrep -v '^root|readonly|\.backup|\.rescue' | sed 's@\ .*@@'`
 else
     if [ -z "$VOLUMES" ]; then
-	VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet -localauth | egrep -v '^root|^bogus|readonly|\.backup' | sed 's@\ .*@@'`
+	VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet -localauth | grep '^[a-z]' | egrep -v '^root|^bogus|readonly|\.backup' | sed -e 's@ .*@@' | sort`
     fi
 fi
 VOLUMES=`echo $VOLUMES`
