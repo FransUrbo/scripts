@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.28 2004-03-03 07:37:53 turbo Exp $
+# $Id: backup,v 1.29 2004-03-22 07:06:38 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -116,7 +116,8 @@ tar cjpsf $BACKUPFILE1 `find etc/ldap etc/krb5* etc/lvm* \
     etc/init.d/{qmail,firewall} etc/profile etc/courier \
     etc/logcheck/ignore.d.server/papadoc etc/xinetd.d \
     etc/krb5.keytab* etc/postgresql/{pg_hba,postgresql}.conf \
-    etc/ssl/{openssl.cnf,CA,certs} $BACKUPFILE5 -type f \
+    etc/ssl/{openssl.cnf,CA,certs} etc/imapd.conf \
+    var/cache/debconf/*.dat $BACKUPFILE5 -type f \
     | egrep -v '~$' | sed -e 's@^/@@' -e 's@\.dpkg-dist@@' | sort`
 check_error "$?" "misc config files"
 
