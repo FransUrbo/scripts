@@ -1,5 +1,7 @@
 #!/usr/bin/perl -w
 
+# $Id: qmail-stats.pl,v 1.11 2004-06-25 11:47:51 turbo Exp $
+
 #$DATE_CONVERTER="/usr/local/bin/tailocal";
 $DATE_CONVERTER="/usr/bin/tai64nlocal";
 
