@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.22 2003-07-07 09:54:07 turbo Exp $
+# $Id: backup_afs.sh,v 1.23 2003-08-27 15:40:20 turbo Exp $
 
 cd /
 
@@ -30,6 +30,27 @@ last_modified () {
 	DATE="$mon/$3/$5"
     else
 	DATE=""
+    fi
+}
+
+# --------------
+# FUNCTION: Check if volume have been modified within the last 24 hours
+#	    Returns 1 if it have, 0 if not
+get_vol_mod () {
+    # Examine volume - when was volume last modified?
+    local last=`vos examine $1 -localauth | grep 'Last Update' | sed 's@.*Update @@'`
+
+    # What's that in UNIX std format (seconds since Jan 1, 1970)?
+    local modified=`date -d "$last" +"%s"`
+
+    # What's the current UNIX std time (- 24h)?
+    local now=`date +"%s"`
+    now=`expr $now - \( 60 \* 60 \* 24 \)`
+
+    if [ $modified -ge $now ]; then
+	return 1
+    else
+	return 0
     fi
 }
 
@@ -147,188 +168,192 @@ dump_volume () {
 
 # --------------
 do_backup () {
-    local VOLUMES="$*"
     local volume
     local BACKUPFILE
     local TIMEARG
     local ERROR
 
-    [ ! -z "$verbose" ] && echo "Backing up volume:"
     for volume in $VOLUMES; do
-	if [ ! -z "$action" ]; then
-	    printf "%s\n" $volume
-	else
-	    [ ! -z "$verbose" ] && printf "  %-25s" $volume
-	fi
+	if ! get_vol_mod $volume; then
+	    # Backup the volume, it have been modified with the last 24 hours
 
-	# Find the 'mountpoint' of the volume
-	[ "$MOUNT" -gt 0 ] && get_vol_mnt $volume
+	    [ ! -z "$verbose" ] && echo "Backing up volume:"
 
-	# Create the backup volume
-	create_backup_volume $volume
-
-	# Catch errors from the backup volume creation
-	if ! echo $RES | grep -q 'Created backup volume for'; then
-	    # FAIL: Could not create backup volume
-	    [ "$RES" != 1 ] && echo -n "Could not create backup volume for '$volume' - "
-
-	    if echo $RES | grep -q 'VLDB: no such entry'; then
-		# FAIL: Volume don't exists
-		echo "no such volume."
-	    elif echo $RES | grep -q 'VLDB: no permission access for call'; then
-		# FAIL: Not enough access rights
-		echo "permission denied."
-	    elif echo $RES | grep -q 'VLDB: vldb entry is already locked'; then
-		# FAIL: Volume database locked
-		echo "Trying to unlock the volume so we can try again"
-
-		vos unlock $volume -localauth > /dev/null 2>&1
-
-		# Try to backup this volume later...
-		MISSING_VOLUMES="$MISSING_VOLUMES $volume"
-	    elif echo $RES | grep -q 'VOLSER: volume is busy'; then
-		# FAIL: Volume is busy
-		echo "volume is busy."
-
-		# Double check that there IS such a volume
-		if vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH | grep -q ^$volume; then
-		    # No such volume - Is there a $volume.readonly we can use?
-		    if vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH | grep -q ^$volume.readonly; then
-			# There is a readonly (replica) volume.
-			echo "The volume '$volume' don't exists (anymore!?), but the '$volume.readonly' does..."
-			TMPFILE=`tempfile -d $BACKUPDIR -p vol.`
-
-			# Dump the volume into a temporary file
-			$action vos dump common.source.kernels.readonly -file $TMPFILE
-
-# TODO: Is this safe? Will it ever happen?
-#			# Restore the volume
-#			$action vos restore -server ${AFSSERVER:-localhost} -partition vicepb \
-#			    -name $volume -file $TMPFILE -id $volume -overwrite full \
-#			    -localauth
-#
-#			# Update the database
-#			$action fs checkv
-#
-#			# Try to create the backup volume again
-#			create_backup_volume $volume
-
-			# Catch an error. Unfortunatly it's to cumbersome to do all 
-			# the previous tests again. I wish there WHERE a goto in sh!
-			if ! echo $RES | grep -q 'Created backup volume for'; then
-			    echo "Could not create backup volume for '$volume' -"
-			    echo "Error message:" ; echo "$RES"
-			fi
-		    fi
-		fi
-
-		# Try to backup this volume later...
-		MISSING_VOLUMES="$MISSING_VOLUMES $volume"
-	    elif echo $RES | grep -q 'Volume needs to be salvaged' ||
-		 echo $RES | grep -q 'Could not re-clone backup volume'
-	    then
-		# ERROR
-		# We might get the following error from this:
-		#
-		#[papadoc.root]# vos backup user.malin -localauth
-		#Could not re-clone backup volume 536871049
-		#: Invalid argument
-		#Error in vos backup command.
-		#: Invalid argument
-		#
-		#[papadoc.pts/6]$ tail -f /var/log/openafs/VolserLog -n0
-		#Mon Oct 28 09:47:53 2002 1 Volser: Clone: The "recloned" volume must be a read only volume; aborted
-		# FAILED - salvage volume
-
-		# Do the salvage TWICE (just to be safe)!
-		i=0 ; while [ "$i" -lt 2 ]; do
-		    echo "Trying to salvage the volume so we can try again"
-		    bos salvage -server ${AFSSERVER:-localhost} -partition $PART -volume $volume -localauth
-
-		    i=`expr $i + 1`
-		done
-
-		# Try to backup this volume later...
-		MISSING_VOLUMES="$MISSING_VOLUMES $volume"
-	    elif [ "$RES" == 1 ]; then
-		# Ignore nonexisting volumes
-		echo -n
+	    if [ ! -z "$action" ]; then
+		printf "%s\n" $volume
 	    else
-		# Unknown reason
-		echo "just failed for some reason." ; echo "Error message:" ; echo "$RES"
+		[ ! -z "$verbose" ] && printf "  %-25s" $volume
 	    fi
-
-	    continue
-	else
-	    # SUCCESS: Created backup volume
-
-	    # Mount the volume on it's mountpoint (VOLUME/OldFiles).
-	    [ "$MOUNT" -gt 0 ] && mount_backup_volume $volume $MNTPOINT
-
-	    if [ -z "$ERROR" ]; then
-		# Find the partition the volume is on
-		get_vol_part $volume
+	    
+	    # Find the 'mountpoint' of the volume
+	    [ "$MOUNT" -gt 0 ] && get_vol_mnt $volume
+	    
+	    # Create the backup volume
+	    create_backup_volume $volume
+	    
+	    # Catch errors from the backup volume creation
+	    if ! echo $RES | grep -q 'Created backup volume for'; then
+		# FAIL: Could not create backup volume
+		[ "$RES" != 1 ] && echo -n "Could not create backup volume for '$volume' - "
 		
-		# Find the size of the volume
-		get_vol_size $volume
-		
-		# Is this a incremental or a full backup? If it's incremental, dump from
-		# last known date
-		BACKUPFILE="$BACKUPDIR/$TYPE-$volume-$CURRENTDATE"
-		if [ "$TYPE" = "incr" ]; then
-		    last_modified "$BACKUPDIR/$TYPE-$volume-"
+		if echo $RES | grep -q 'VLDB: no such entry'; then
+		    # FAIL: Volume don't exists
+		    echo "no such volume."
+		elif echo $RES | grep -q 'VLDB: no permission access for call'; then
+		    # FAIL: Not enough access rights
+		    echo "permission denied."
+		elif echo $RES | grep -q 'VLDB: vldb entry is already locked'; then
+		    # FAIL: Volume database locked
+		    echo "Trying to unlock the volume so we can try again"
 		    
-		    if [ ! -z "$DATE" ]; then
-			if [ ! -z "$verbose" ]; then
-			    echo "dump > '$DATE'"
+		    vos unlock $volume -localauth > /dev/null 2>&1
+		    
+		    # Try to backup this volume later...
+		    MISSING_VOLUMES="$MISSING_VOLUMES $volume"
+		elif echo $RES | grep -q 'VOLSER: volume is busy'; then
+		    # FAIL: Volume is busy
+		    echo "volume is busy."
+		    
+		    # Double check that there IS such a volume
+		    if vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH | grep -q ^$volume; then
+			# No such volume - Is there a $volume.readonly we can use?
+			if vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH | grep -q ^$volume.readonly; then
+			    # There is a readonly (replica) volume.
+			    echo "The volume '$volume' don't exists (anymore!?), but the '$volume.readonly' does..."
+			    TMPFILE=`tempfile -d $BACKUPDIR -p vol.`
+			    
+			    # Dump the volume into a temporary file
+			    $action vos dump common.source.kernels.readonly -file $TMPFILE
+			    
+# TODO: Is this safe? Will it ever happen?
+#			    # Restore the volume
+#			    $action vos restore -server ${AFSSERVER:-localhost} -partition vicepb \
+#				-name $volume -file $TMPFILE -id $volume -overwrite full \
+#				-localauth
+#				
+#			    # Update the database
+#			    $action fs checkv
+#			    
+#			    # Try to create the backup volume again
+#			    create_backup_volume $volume
+
+			    # Catch an error. Unfortunatly it's to cumbersome to do all 
+			    # the previous tests again. I wish there WHERE a goto in sh!
+			    if ! echo $RES | grep -q 'Created backup volume for'; then
+				echo "Could not create backup volume for '$volume' -"
+				echo "Error message:" ; echo "$RES"
+			    fi
 			fi
-			TIMEARG="-time $DATE"
-		    else
-			BACKUPFILE="$BACKUPDIR/full-$volume-$CURRENTDATE"
 		    fi
+		    
+		    # Try to backup this volume later...
+		    MISSING_VOLUMES="$MISSING_VOLUMES $volume"
+		elif echo $RES | grep -q 'Volume needs to be salvaged' ||
+		    echo $RES | grep -q 'Could not re-clone backup volume'
+		then
+		    # ERROR
+		    # We might get the following error from this:
+		    #
+		    #[papadoc.root]# vos backup user.malin -localauth
+		    #Could not re-clone backup volume 536871049
+		    #: Invalid argument
+		    #Error in vos backup command.
+		    #: Invalid argument
+		    #
+		    #[papadoc.pts/6]$ tail -f /var/log/openafs/VolserLog -n0
+		    #Mon Oct 28 09:47:53 2002 1 Volser: Clone: The "recloned" volume must be a read only volume; aborted
+		    # FAILED - salvage volume
+		
+		    # Do the salvage TWICE (just to be safe)!
+		    i=0 ; while [ "$i" -lt 2 ]; do
+			echo "Trying to salvage the volume so we can try again"
+			bos salvage -server ${AFSSERVER:-localhost} -partition $PART -volume $volume -localauth
+			
+			i=`expr $i + 1`
+		    done
+		    
+		    # Try to backup this volume later...
+		    MISSING_VOLUMES="$MISSING_VOLUMES $volume"
+		elif [ "$RES" == 1 ]; then
+		    # Ignore nonexisting volumes
+		    echo -n
+		else
+		    # Unknown reason
+		    echo "just failed for some reason." ; echo "Error message:" ; echo "$RES"
 		fi
 		
-		dump_volume $volume $BACKUPFILE
-		if [ -z "$?" ]; then
-		    ERROR=2
-		fi
-		
-		if echo $RES | grep -q 'Dumped volume'; then
-		    # DUMP FAILED - any reason
-		
-		    RES=`echo $RES | sed 's@.* /@/@'`
-		    [ ! -z "$verbose" ] && echo "$RES"
-		fi
-		
-		# ------------------
-		# Restore the backup. It does not matter if the volume exists and is mounted,
-		# it will be removed and then created when using '-overwrite full'...
-		# 	vos restore papadoc /vicepb $volume -file full-$BACKUPFILE -overwrite full
-		# 	vos restore papadoc /vicepb $volume -file incr-$BACKUPFILE -overwrite incremental
-		#
-		# If the volume didn't exist and wasn't mounted:
-		# 	fs mkmount /afs/$AFSCELL/$MOUNTPOINT $volume
-		# 	vos release root.cell
-		# ------------------
+		continue
+	    else
+		# SUCCESS: Created backup volume
+	    
+		# Mount the volume on it's mountpoint (VOLUME/OldFiles).
+		[ "$MOUNT" -gt 0 ] && mount_backup_volume $volume $MNTPOINT
 		
 		if [ -z "$ERROR" ]; then
-		    # Remove the mountpoint
-		    [ "$MOUNT" -gt 0 ] && $action fs rmmount "$OLDFILES"
+		    # Find the partition the volume is on
+		    get_vol_part $volume
 		    
-		    # Remove the backup volume
-		    if [ -z "$action" ]; then
-			if [ "$BACKUP_VOLUMES" -gt 0 ]; then
-			    vos remove -id $volume.backup -localauth > /dev/null 2>&1 &
+		    # Find the size of the volume
+		    get_vol_size $volume
+		    
+		    # Is this a incremental or a full backup? If it's incremental, dump from
+		    # last known date
+		    BACKUPFILE="$BACKUPDIR/$TYPE-$volume-$CURRENTDATE"
+		    if [ "$TYPE" = "incr" ]; then
+			last_modified "$BACKUPDIR/$TYPE-$volume-"
+			
+			if [ ! -z "$DATE" ]; then
+			    if [ ! -z "$verbose" ]; then
+				echo "dump > '$DATE'"
+			    fi
+			    TIMEARG="-time $DATE"
+			else
+			    BACKUPFILE="$BACKUPDIR/full-$volume-$CURRENTDATE"
+			fi
+		    fi
+		    
+		    dump_volume $volume $BACKUPFILE
+		    if [ -z "$?" ]; then
+			ERROR=2
+		    fi
+		    
+		    if echo $RES | grep -q 'Dumped volume'; then
+			# DUMP FAILED - any reason
+		
+			RES=`echo $RES | sed 's@.* /@/@'`
+			[ ! -z "$verbose" ] && echo "$RES"
+		    fi
+		    
+		    # ------------------
+		    # Restore the backup. It does not matter if the volume exists and is mounted,
+		    # it will be removed and then created when using '-overwrite full'...
+		    # 	vos restore papadoc /vicepb $volume -file full-$BACKUPFILE -overwrite full
+		    # 	vos restore papadoc /vicepb $volume -file incr-$BACKUPFILE -overwrite incremental
+		    #
+		    # If the volume didn't exist and wasn't mounted:
+		    # 	fs mkmount /afs/$AFSCELL/$MOUNTPOINT $volume
+		    # 	vos release root.cell
+		    # ------------------
+		    
+		    if [ -z "$ERROR" ]; then
+			# Remove the mountpoint
+			[ "$MOUNT" -gt 0 ] && $action fs rmmount "$OLDFILES"
+			
+			# Remove the backup volume
+			if [ -z "$action" ]; then
+			    if [ "$BACKUP_VOLUMES" -gt 0 ]; then
+				vos remove -id $volume.backup -localauth > /dev/null 2>&1 &
+			    else
+				$action vos remove -id $volume.backup -localauth
+			    fi
 			else
 			    $action vos remove -id $volume.backup -localauth
 			fi
-		    else
-			$action vos remove -id $volume.backup -localauth
 		    fi
 		fi
+		
+		[ ! -z "$action" -o ! -z "$verbose" ] && echo '-----'
 	    fi
-
-	    [ ! -z "$action" -o ! -z "$verbose" ] && echo '-----'
 	fi
     done
 }
@@ -400,7 +425,7 @@ else
 fi
 VOLUMES=`echo $VOLUMES`
 
-do_backup $VOLUMES
+do_backup
 
 if [ ! -z "$MISSING_VOLUMES" ]; then
     echo "ERROR: Did not backup the volumes: $MISSING_VOLUMES." > /dev/stderr
