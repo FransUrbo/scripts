@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.18 2003-03-14 07:37:17 turbo Exp $
+# $Id: backup,v 1.19 2003-06-25 12:41:46 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -18,6 +18,8 @@ BACKUPVOLDIR="/var/.backups-volumes" # Make sure this is the same dir as
 				     # configured in /usr/local/sbin/backup_afs.sh
 
 cd /
+
+echo "Starting system backup at" `date +"%Y%m%d %H:%M:%S"`
 
 # Support function
 check_error () {
@@ -121,9 +123,14 @@ for file in $BACKUPFILES; do
 done
 rm -f $BACKUPFILE5
 
+echo "Ending system backup at" `date +"%Y%m%d %H:%M:%S"`
+echo
+
 # -----------------
 # Backup the AFS volumes
 if [ -x /usr/local/sbin/backup_afs.sh ]; then
+    echo "Starting AFS volume backup at" `date +"%Y%m%d %H:%M:%S"`
+
     # Do we backup odd or even weeks?
     ODD=`expr \`date +"%V"\` % 2`
     DAY=`date +"%w"`
@@ -152,10 +159,16 @@ if [ -x /usr/local/sbin/backup_afs.sh ]; then
 	# Do a INCREMENTAL volume backup
 	/usr/local/sbin/backup_afs.sh -i 2>&1
     fi
+
+    echo "Ending AFS volume backup at" `date +"%Y%m%d %H:%M:%S"`
+    echo
 fi
 
 # Do a INCREMENTAL backup to tape
 if [ ! -z "$DO_INCREMENTAL" ]; then
+    echo "Starting tape backup at" `date +"%Y%m%d %H:%M:%S"`
     incr_backup -d
+    echo "Ending tape backup at" `date +"%Y%m%d %H:%M:%S"`
+    echo
 fi
 
