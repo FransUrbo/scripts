@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.18 2003-01-28 12:55:20 turbo Exp $
+# $Id: backup_afs.sh,v 1.19 2003-01-29 08:41:49 turbo Exp $
 
 cd /
 
@@ -250,7 +250,7 @@ do_backup () {
 
 		# Try to backup this volume later...
 		MISSING_VOLUMES="$MISSING_VOLUMES $volume"
-	    elif [ "$RES" != 1 ]; then
+	    elif [ "$RES" == 1 ]; then
 		# Ignore nonexisting volumes
 	    else
 		# Unknown reason
