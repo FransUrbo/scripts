@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.21 2003-08-22 06:44:54 turbo Exp $
+# $Id: backup,v 1.22 2003-09-21 07:58:29 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -26,7 +26,7 @@ check_error () {
     local errcode=$1 ; shift
     local msg="$*"
 
-    if [ "$errcode" == "0" ]; then
+    if [ "$errcode" = "0" ]; then
 	echo "Successfully backed up $msg."
     else
 	echo "Failed to backup $msg!"
@@ -45,8 +45,19 @@ fi
 # ----- P O S T G R E S Q L -----
 TMPFILE=`tempfile -p psql.` ; chown postgres $TMPFILE ; chmod 600 $TMPFILE
 su postgres -c "/usr/lib/postgresql/bin/pg_dumpall -c > $TMPFILE 2> /dev/null"
-code=$? ; check_error "$?" "PostgreSQL database(s)"
-if [ "$code" == "0" ]; then
+code=$? ; check_error "$code" "PostgreSQL database(s)"
+if [ "$code" != "0" ]; then
+    #  Error occured - test if PostgreSQL is alive.
+    psql template1 -q -c 'SHOW TimeZone;' -o /dev/null 2> /dev/null
+    code=$?
+    if [ "$code" -gt 0 ]; then
+	if [ "$code" = "2" ]; then
+	    echo "  -=> PostgreSQL does not accept connections. Is it started?"
+	else
+	    echo "  -=> Other PostgreSQL error ($code)"
+	fi
+    fi
+else
     cat $TMPFILE | bzip2 > $BACKUPFILE9
     rm -f $TMPFILE
 fi
@@ -57,7 +68,7 @@ USER=`cat /root/.my.cnf | grep ^user | sed 's@.*= @@'`
 PASS=`cat /root/.my.cnf | grep ^pass | sed 's@.*= @@'`
 /usr/bin/mysqldump -u $USER --password=$PASS -A --opt > $TMPFILE
 code=$? ; check_error "$?" "MySQL database(s)"
-if [ "$code" == "0" ]; then
+if [ "$code" = "0" ]; then
     cat $TMPFILE | bzip2 > $BACKUPFILE2
     rm -f $TMPFILE
 fi
@@ -133,7 +144,7 @@ if [ -x /usr/local/sbin/backup_afs.sh ]; then
     # Do we backup odd or even weeks?
     ODD=`expr \`date +"%V"\` % 2`
     DAY=`date +"%w"`
-    if [ "$DAY" == "1" ]; then
+    if [ "$DAY" = "1" ]; then
 	# This is a monday, clean the backup directory. We'll
 	# have PREVIOUS weeks backup(s) intact -> At least one
 	# weeks of backup(s) online.
