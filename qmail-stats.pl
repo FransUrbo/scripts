@@ -76,17 +76,17 @@ while(! eof(STDIN) ) {
 	#	cvs-phpqladmin-accept-1039674204.20422.dcchhkffaapngloidhkm@bayour.com
 	#	phpqladmin-sc.1043669747.agifmnfgpjpbaiklmfpl-jjo-phpqladmin=mendoza.gov.ar@bayour.com
 	#	phpqladmin-request@bayour.com
-	#	phpqladmin-return.*-@bayour.com
+	#	phpqladmin-return*-@bayour.com
 	#	phpqladmin-subscibe@bayour.com
 	#	phpqladmin-subscribe-ehults=paydata.com@bayour.com
 	#	phpqladmin-faq@bayour.com
 	#	phpqladmin-help@bayour.com
 	#	phpqladmin-info@bayour.com
 	# (ezmlm mailinglist moderation request etc)
-	if(($recip =~ /.*-accept-.*/) || ($recip =~ /.*-sc\.[0-9].*=/) ||
+	if(($recip =~ /.*-accept-.*/) || ($recip =~ /.*-[us]c\.[0-9].*=/) ||
 	   ($recip =~ /.*-request\@.*/) || ($recip =~ /.*-subscribe.*/) ||
 	   ($recip =~ /.*-faq\@.*/) || ($recip =~ /.*-help.*\@.*/) || 
-	   ($recip =~ /.*-return.*-\@.*/) || ($recip =~ /.*-info\@.*/))
+	   ($recip =~ /.*-return.*\@.*/) || ($recip =~ /.*-info\@.*/))
 	{
 	    $recip =~ s!-.*\@!\@!;
 	}
