@@ -1,5 +1,9 @@
 #!/usr/bin/perl -w
 
+@LIST = ('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
+	 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
+	 'y', 'z');
+
 # ------------------------------------
 sub scsi_target() {
     my($dev) = @_;
@@ -52,6 +56,7 @@ if(open(MDSTAT, "/proc/mdstat")) {
 }
 
 # ------------------------------------
+$scsi_number = 0;
 open(SCSI, "/proc/scsi/scsi") || die "Can't open /proc/scsi/scsi, $!\n";
 $line[0] = <SCSI>;
 
@@ -82,11 +87,19 @@ while(! eof(SCSI)) {
     }
 
     # Get scsi controller and disk ID
-    $dev =  "/dev/scsi/host$ctrl/bus0/target$id/lun$lun/disc";
+    $dev1 = "/dev/scsi/host$ctrl/bus0/target$id/lun$lun/disc";
+    $dev2 = $LIST[$scsi_number];
+
+    if(-e "$dev1") {
+	$dev = $dev1;
+    } elsif(-e "/dev/sd$dev2") {
+	$dev = "/dev/sd$dev2";
+    }
 
     # Get the size of the disc
-    open(FDISK, "fdisk -l $dev 2>&1 | egrep '/disc3|^Disk.*contain a valid' |")
-	|| die("Can't read from fdisk, $!\n");
+    $grp = '/sd'.$dev2.'3';
+    open(FDISK, "fdisk -l $dev 2>&1 | egrep '/disc3|$grp|^Disk.*contain a valid' |")
+        || die("Can't read from fdisk, $!\n");
     $fdisk = <FDISK>;
     close(FDISK);
 
@@ -115,4 +128,6 @@ while(! eof(SCSI)) {
 	printf(STDERR "%4s %-2s %-9s %-18s %-5s %5s\n",
 	       $ctrl, $ID, $vend, $model, $rev, $size);
     }
+
+    $scsi_number++;
 }
