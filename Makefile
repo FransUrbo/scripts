@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.16 2003-10-18 13:55:12 turbo Exp $
+# $Id: Makefile,v 1.17 2003-10-20 19:38:23 turbo Exp $
 
 sBINARIES="backup_afs.sh update_afs.sh salvage_afs.sh qmail-runq qmail-stats.pl"
 uBINARIES="df_afs.pl list_afs_vols.sh"
@@ -16,6 +16,11 @@ install all:	clean
 	    sed -e "s@%DIRS%@`cat .dirs-$$host`@" backup-rmgztk_morwen \
 	        -e "s@%HOST%@$$host@" > .TMPFILE; \
 	    rcp -x .TMPFILE root@$$host:/sbin/backup-$$host; \
+	    rm .TMPFILE; \
+	    echo; \
+	    echo -n "\`test-slapd.pl' -> \`$$host:/sbin/test-slapd.pl'"; \
+	    sed -e "s@%HOST%@$$host@" < test-slapd.pl > .TMPFILE; \
+	    rcp -x .TMPFILE root@$$host:/sbin/test-slapd.pl; \
 	    rm .TMPFILE; \
 	    echo; \
 	    echo -n "\`test-smtp.pl' -> \`$$host:/usr/sbin/test-smtp.pl'"; \
