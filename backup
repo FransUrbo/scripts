@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.12 2002-10-13 08:24:34 turbo Exp $
+# $Id: backup,v 1.13 2002-12-12 15:37:42 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -11,7 +11,8 @@ BACKUPFILE6=$BACKUPDIR/Important/important-$DATE.tar.bz2
 BACKUPFILE7=$BACKUPDIR/Logs/oldlogs-$DATE.tar.bz2
 BACKUPFILE8=$BACKUPDIR/AFBackup/afbackup_var-$DATE.tar.bz2
 BACKUPFILE9=$BACKUPDIR/PostgreSQL/postgresql-$DATE.sql.bz2
-BACKUPFILES="$BACKUPFILE1 $BACKUPFILE2 $BACKUPFILE4 $BACKUPFILE6 $BACKUPFILE7 $BACKUPFILE9"
+BACKUPFILE10=$BACKUPDIR/CVS/cvs-$DATE.tar.bz2
+BACKUPFILES="$BACKUPFILE1 $BACKUPFILE2 $BACKUPFILE4 $BACKUPFILE6 $BACKUPFILE7 $BACKUPFILE9 $BACKUPFILE10"
 BACKUPVOLDIR="/var/.backups-volumes" # Make sure this is the same dir as
 				     # configured in /usr/local/sbin/backup_afs.sh
 
@@ -71,6 +72,10 @@ mkdir /tmp/$$ && chmod 700 /tmp/$$ && ( \
     find -type f -exec ls -ln {} \; > /tmp/$$/LDAPv3_install.filelist; \
 ) && cd /tmp/$$ && tar cjpsf $BACKUPFILE6 . && rm -R /tmp/$$
 unlog && kdestroy
+
+# -----------------
+# CVS archive
+cd / && tar cjpsf $BACKUPFILE10 var/cvs
 
 # -----------------
 # Logfiles...
