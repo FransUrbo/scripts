@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.19 2003-06-25 12:41:46 turbo Exp $
+# $Id: backup,v 1.20 2003-06-26 11:18:49 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -166,9 +166,7 @@ fi
 
 # Do a INCREMENTAL backup to tape
 if [ ! -z "$DO_INCREMENTAL" ]; then
-    echo "Starting tape backup at" `date +"%Y%m%d %H:%M:%S"`
     incr_backup -d
-    echo "Ending tape backup at" `date +"%Y%m%d %H:%M:%S"`
     echo
 fi
 
