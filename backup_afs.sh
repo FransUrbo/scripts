@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.28 2004-01-01 17:55:45 turbo Exp $
+# $Id: backup_afs.sh,v 1.29 2004-02-03 06:32:27 turbo Exp $
 
 cd /
 
@@ -12,7 +12,7 @@ CURRENTDATE=`date +"%Y%m%d"`
 MAXSIZE=2000000
 
 # Don't change this, it's set with commandline options
-TYPE="full"
+BACKUP_TYPE="all"
 
 # --------------
 # FUNCTION: Find the LATEST modification date of a file
@@ -37,7 +37,7 @@ last_modified () {
 # FUNCTION: Check if volume have been modified within the last 24 hours
 #	    Returns 1 if it have, 0 if not
 get_vol_mod () {
-    if [ "$TYPE" = "all" ]; then
+    if [ "$BACKUP_TYPE" = "all" ]; then
 	# Backup this volume wether it's been modified resently or not: --all specified!
 	return 1
     fi
@@ -305,7 +305,7 @@ do_backup () {
 		    
 		    # Is this a incremental or a full backup? If it's incremental, dump from
 		    # last known date
-		    if [ "$TYPE" = "incr" ]; then
+		    if [ "$BACKUP_TYPE" = "incr" ]; then
 			BACKUPFILE="$BACKUPDIR/incr-$volume-$CURRENTDATE"
 			last_modified "$BACKUPDIR/incr-$volume-"
 			
@@ -317,9 +317,7 @@ do_backup () {
 			else
 			    BACKUPFILE="$BACKUPDIR/full-$volume-$CURRENTDATE"
 			fi
-		    elif [ "$TYPE" = "full" ]; then
-			BACKUPFILE="$BACKUPDIR/full-$volume-$CURRENTDATE"
-		    elif [ "$TYPE" = "all" ]; then
+		    elif [ "$BACKUP_TYPE" = "all" ]; then
 			BACKUPFILE="$BACKUPDIR/full-$volume-$CURRENTDATE"
 		    fi
 		    
@@ -411,8 +409,8 @@ while true ; do
 	-c|--nocreate-vol)	BACKUP_VOLUMES=0 ; shift ;;
 	-e|--echo)		action='echo' ; shift ;;
 	-u|--users)		VOLUMES=users ; shift ;;
-	-i|--incr)		TYPE=incr     ; shift ;;
-	-a|--all)		TYPE=all      ; shift ;;
+	-i|--incr)		BACKUP_TYPE=incr     ; shift ;;
+	-a|--all)		BACKUP_TYPE=all      ; shift ;;
 	-m|--mount)		MOUNT=1       ; shift ;;
 	-v|--verbose)		verbose=1     ; shift ;;
 	--)			shift ; VOLUMES="$*" ; break ;; 
