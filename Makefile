@@ -1,8 +1,8 @@
-# $Id: Makefile,v 1.25 2004-07-23 09:19:53 turbo Exp $
+# $Id: Makefile,v 1.26 2004-07-25 09:25:39 turbo Exp $
 
 sBIN		= /afs/bayour.com/common/noarch/sbin
 uBIN		= /afs/bayour.com/common/noarch/bin
-sBINARIES	= backup_afs.sh update_afs.sh salvage_afs.sh qmail-runq qmail-stats.pl convert_openldap_db.pl change_openldap_db_layout.pl create_cert.sh ldapadduser.sh qmail-qclean.sh qmail-smtpd-summary.pl qmail-summary.pl
+sBINARIES	= backup_afs.sh update_afs.sh salvage_afs.sh qmail-runq qmail-stats.pl convert_openldap_db.pl change_openldap_db_layout.pl create_cert.sh ldapadduser.sh qmail-qclean.sh qmail-smtpd-summary.pl qmail-summary.pl modify_ldap_database.pl
 uBINARIES	= df_afs.pl list_afs_vols.sh idn.sh
 
 install all:	clean
