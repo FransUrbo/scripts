@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.15 2002-11-04 17:06:49 turbo Exp $
+# $Id: backup_afs.sh,v 1.16 2002-12-08 10:43:59 turbo Exp $
 
 cd /
 
@@ -57,7 +57,18 @@ get_vol_mnt () {
 # FUNCTION: Find the partition the volume is on
 get_vol_part () {
     PART=`vos examine $1 -localauth | sed 1d | head -n1 | sed 's@.*/@/@'`
-    [ ! -z "$action" -o ! -z "$verbose" ] && printf "%-65s" "Partition for volume $volume is $PART"
+    if [ -z "$PART" ]; then
+	# Could not find the partition, try again
+	PART=`vos examine $vol $LOCALAUTH | egrep 'server .* partition .* RW Site' | sed -e 's@.*/@/@' -e 's@ .*@@'`
+    fi
+
+    if [ -z "$PART" ]; then
+	# Could not find the partition, DIE, DIE, DIE!!!
+	echo "Can't find the partition for the volume!"
+	exit 255
+    else
+	[ ! -z "$action" -o ! -z "$verbose" ] && printf "%-65s" "Partition for volume $volume is $PART"
+    fi
 }
 
 # --------------
