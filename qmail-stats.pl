@@ -60,6 +60,7 @@ while(! eof(STDIN) ) {
 	    $msgnr =  (split(' ', $line))[3];
 	}
 	$msgnr =~ s/:$//;
+	next if(!$msgnr);
 
 	# Get the time
 	$begin{$msgnr} = &get_time($line);
@@ -100,7 +101,11 @@ while(! eof(STDIN) ) {
 	$recip = lc($recip);
 
 	$dest{$msgnr} = $recip;
-	$delivery{$recip}++;
+	$domain = (split('\@', $recip))[1];
+
+	$tmp = (split('\@', $recip))[0];
+	$delivery{$domain}{$tmp}++;
+	$delivery{$domain}{'TOP'}++;
 
 	# If this is the first delivery, we need to
 	# remember the date and time for this
@@ -136,6 +141,7 @@ while(! eof(STDIN) ) {
     }
     $i++ if($DEBUG);
 }
+exit(0) if(!$msgnr); # We have no statistics - exit
 
 LOOP:
     # Remember the last entry
@@ -165,12 +171,21 @@ LOOP:
     # Output the statistics
     print "\n" if($allstats);
     print "Status between '$first' and '$last'\n";
-    printf("Highest time of delivery:             %5d\n", $high);
-    printf("Average delivery time:                %5d\n", $avg/$i);
-    printf("Number of deliveries:                 %5d\n", $i);
+    printf("Highest time of delivery:           %5d\n", $high);
+    printf("Average delivery time:              %5d\n", $avg/$i);
+    printf("Number of deliveries:               %5d\n\n", $i);
 
     if($emails) {
-	foreach $recip (sort keys(%delivery)) {
-	    printf("  %-35s  %4d\n", $recip, $delivery{$recip});
+	foreach $domain (sort keys(%delivery)) {
+	    printf("Domain: %-27s %5d\n", $domain, $delivery{$domain}->{'TOP'});
+
+	    # Dereference the two-dimensional array.
+	    foreach $recip (sort keys(%{ $delivery{$domain} })) {
+		if($recip ne 'TOP') {
+		    printf("        %-27s %5d\n", $recip, $delivery{$domain}->{$recip});
+		}
+	    }
+
+	    print "\n";
 	}
     }
