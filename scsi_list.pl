@@ -92,13 +92,14 @@ while(! eof(SCSI)) {
 
     if(-e "$dev1") {
 	$dev = $dev1;
+        $grp = '';
     } elsif(-e "/dev/sd$dev2") {
 	$dev = "/dev/sd$dev2";
+        $grp = '|/sd'.$dev2.'3';
     }
 
     # Get the size of the disc
-    $grp = '/sd'.$dev2.'3' if($dev =~ /\/dev\/sd/);
-    open(FDISK, "fdisk -l $dev 2>&1 | egrep '/disc3|$grp|^Disk.*contain a valid' |")
+    open(FDISK, "fdisk -l $dev 2>&1 | egrep '/disc3$grp|^Disk.*contain a valid' |")
         || die("Can't read from fdisk, $!\n");
     $fdisk = <FDISK>;
     close(FDISK);
