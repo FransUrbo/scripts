@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.32 2004-10-29 15:26:59 turbo Exp $
+# $Id: backup_afs.sh,v 1.33 2004-12-22 13:15:13 turbo Exp $
 
 cd /
 
@@ -348,15 +348,17 @@ do_backup () {
 			# Remove the mountpoint
 			[ "$MOUNT" -gt 0 ] && $action fs rmmount "$OLDFILES"
 			
-			# Remove the backup volume
-			if [ -z "$action" ]; then
-			    if [ "$BACKUP_VOLUMES" -gt 0 ]; then
-				vos remove -id $volume.backup $LOCALAUTH > /dev/null 2>&1 &
+			if [ "$DELETE_VOLUMES" -gt 0 ]; then
+			    # Remove the backup volume
+			    if [ -z "$action" ]; then
+				if [ "$BACKUP_VOLUMES" -gt 0 ]; then
+				    vos remove -id $volume.backup $LOCALAUTH > /dev/null 2>&1 &
+				else
+				    $action vos remove -id $volume.backup $LOCALAUTH
+				fi
 			    else
 				$action vos remove -id $volume.backup $LOCALAUTH
 			    fi
-			else
-			    $action vos remove -id $volume.backup $LOCALAUTH
 			fi
 		    fi
 		fi
@@ -375,15 +377,15 @@ do_backup () {
 # =================================================================
 
 # Don't change this
-MOUNT=0 ; BACKUP_VOLUMES=1
+MOUNT=0 ; BACKUP_VOLUMES=1 ; DELETE_VOLUMES=1
 
 # --------------
 # Do we backup odd or even weeks?
 ODD=`expr \`date +"%V"\` % 2`
 if [ "$ODD" != "1" ]; then
-    BACKUPDIR="/var/.backups-volumes/odd"
+    BACKUPDIR="/mnt/chroot/Backups-Volumes/odd"
 else
-    BACKUPDIR="/var/.backups-volumes/even"
+    BACKUPDIR="/mnt/chroot/Backups-Volumes/even"
 fi
 
 if [ ! -d "$BACKUPDIR" ]; then
@@ -392,7 +394,7 @@ fi
 
 # --------------
 # Get the CLI options...
-TEMP=`getopt -o heuimcva --long help,echo,users,incr,mount,nocreate-vol,verbose,all -- "$@"`
+TEMP=`getopt -o heuimcdva --long help,echo,users,incr,mount,nocreate-vol,nodelete-vol,verbose,all -- "$@"`
 eval set -- "$TEMP"
 while true ; do
     case "$1" in
@@ -405,12 +407,14 @@ while true ; do
 	    echo "	 -a,--all		Do a FULL backup (even volumes not changed)"
 	    echo "	 -m,--mount		Mount the volumes before doing the backup"
 	    echo "	 -c,--nocreate-vol	Don't create the backup volume(s) before backup"
+	    echo "	 -d,--nodelete-vol	Don't delete the backup volume(s) after backup"
 	    echo "	 -v,--verbose		Explain what's to be done"
 	    echo "If volume is given, only backup that/those volumes."
 	    echo 
 	    exit 0
 	    ;;
 	-c|--nocreate-vol)	BACKUP_VOLUMES=0 ; shift ;;
+	-d|--nodelete-vol)	DELETE_VOLUMES=0 ; shift ;;
 	-e|--echo)		action='echo' ; shift ;;
 	-u|--users)		VOLUMES=users ; shift ;;
 	-i|--incr)		BACKUP_TYPE=incr     ; shift ;;
