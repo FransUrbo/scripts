@@ -1,5 +1,62 @@
 #!/usr/bin/perl -w
 
+# -------------------------------------------------------------------------------------------------------------------
+# Successfull remote delivery:
+# 1054189746.123136 new msg 161214
+# 1054189746.123151 info msg 161214: bytes 830 from <turbo@bayour.com> qp 6190 uid 1000
+# 1054189746.123958 starting delivery 119: msg 161214 to remote turbo@tripnet.se
+# 1054189746.123980 status: local 0/10 remote 1/20
+# 1054189746.373645 delivery 119: success: 195.100.21.7_accepted_message./Remote_host_said:_250_OK_id=19LGuQ-0003OJ-00/
+# 1054189746.374171 status: local 0/10 remote 0/20
+# 1054189746.374332 end msg 161214
+# 
+# Successfull local delivery:
+# 1054189750.812151 new msg 161214
+# 1054189750.812169 info msg 161214: bytes 1676 from <turbo@bayour.com> qp 6206 uid 64014
+# 1054189750.812192 starting delivery 120: msg 161214 to local turbo@bayour.com
+# 1054189750.812212 status: local 1/10 remote 0/20
+# 1054189754.376563 delivery 120: success: did_0+0+1/
+# 1054189754.377277 status: local 0/10 remote 0/20
+# 1054189754.377470 end msg 161214
+#
+# Failed remote delivery 1:
+# 1054194593.322882 new msg 161214
+# 1054194593.322896 info msg 161214: bytes 869 from <turbo@bayour.com> qp 24150 uid 1000
+# 1054194593.322921 starting delivery 183: msg 161214 to remote fjkdasljf@nocrew.org
+# 1054194593.322944 status: local 0/10 remote 1/20
+# 1054194596.057500 delivery 183: failure: 213.242.147.30_does_not_like_recipient./Remote_host_said:_550_Unknown_local_part_fjkdasljf_in_<fjkdasljf@nocrew.org>/Giving_up_on_213.242.147.30./
+# 1054194596.058353 status: local 0/10 remote 0/20
+# 1054194596.081499 bounce msg 161214 qp 24162
+# 1054194596.081517 end msg 161214
+#
+# Failed local delivery:
+# 1054189045.549445 new msg 161214
+# 1054189045.549570 info msg 161214: bytes 7308 from <baby3@3333.3utilities.com> qp 976 uid 64014
+# 1054189045.549657 starting delivery 108: msg 161214 to local 87smtjy4le.fsf@papadoc.bayour.com
+# 1054189045.549681 status: local 1/10 remote 0/20
+# 1054189046.239668 delivery 108: failure: Sorry,_no_mailbox_here_by_that_name._(#5.1.1)/
+# 1054189046.240474 status: local 0/10 remote 0/20
+# 1054189046.260176 bounce msg 161214 qp 981
+# 1054189046.260452 end msg 161214
+# -------------------------------------------------------------------------------------------------------------------
+
+sub get_msg_nr {
+    my($line, $place) = @_;
+    my($msgnr);
+
+    # Get the msg number
+    if($line =~ /^20[0-9][0-9]-.*/) {
+	# Human readable
+	$msgnr = (split(' ', $line))[$place+1];
+    } else {
+	# Unix std time
+	$msgnr = (split(' ', $line))[$place];
+    }
+	
+    $msgnr =~ s/:$//;
+    return($msgnr);
+}
+
 sub get_time {
     my($line) = @_;
 
@@ -25,14 +82,12 @@ if($ARGV[0]) {
 	$arg = $ARGV[$i];
 
 	$allstats=1 if($arg eq '--all');
-	$DEBUG=1 if($arg eq '--debug');
 	$emails=1 if(($arg eq '--emails') || ($arg eq '--all'));
 	$quiet=1 if($arg eq '--quiet');
 
 	if($arg eq '--help') {
 	    print "Usage: `basename $0` [options]\n";
 	    print "       --all                  Show information of each deliver (start, end, recipient etc)\n";
-	    print "       --debug                Only do the first 100 lines in the file\n";
 	    print "       --emails               Show number of deliveries to each email address\n";
 	    print "       --domain [domain.tld]  Output statistics for domain.tld only\n";
 	    print "       --quiet                Output one line with 'received sent bounce' values\n";
@@ -48,29 +103,18 @@ if($ARGV[0]) {
 $hostname = `hostname`;
 chomp($hostname);
 
-$i = $bounce = $remote = 0; 
+$i = $bounce = $remote = 0; %bounce = %remote = %delivery = ();
 while(! eof(STDIN) ) {
     $line = <STDIN>; chomp($line);
 
     if($line =~ / starting delivery .*:.* to local /) {
-	# 1032237315.334422 starting delivery 1: msg 16799625 to local turbo@bayour.com
-	#
-	# 2002-09-17 06:35:15.334422 starting delivery 1: msg 16799625 to local turbo@bayour.com
-
-	# Get the msg number
-	if($line =~ /^20[0-9][0-9]-.*/) {
-	    # Human readable
-	    $msgnr =  (split(' ', $line))[4];
-	} else {
-	    # Unix std time
-	    $msgnr =  (split(' ', $line))[3];
-	}
-	$msgnr =~ s/:$//;
+	$msgnr = &get_msg_nr($line, 3);
 	next if(!$msgnr);
 
 	# Get the time
 	$begin{$msgnr} = &get_time($line);
 
+	# Get recipient
 	if($line =~ /^20[0-9][0-9]-.*/) {
 	    # Human readable
 	    $recip = (split(' ', $line))[9];
@@ -89,11 +133,14 @@ while(! eof(STDIN) ) {
 	#	phpqladmin-faq@bayour.com
 	#	phpqladmin-help@bayour.com
 	#	phpqladmin-info@bayour.com
+	#	phpqladmin-index.123_456
+	#	phpqladmin-unsubscribe-kaarnale-phpqladmin=majorus.fi
 	# (ezmlm mailinglist moderation request etc)
 	if(($recip =~ /.*-accept-.*/) || ($recip =~ /.*-[us]c\.[0-9].*=/) ||
 	   ($recip =~ /.*-request\@.*/) || ($recip =~ /.*-subscribe.*/) ||
 	   ($recip =~ /.*-faq\@.*/) || ($recip =~ /.*-help.*\@.*/) || 
-	   ($recip =~ /.*-return.*\@.*/) || ($recip =~ /.*-info\@.*/))
+	   ($recip =~ /.*-return.*\@.*/) || ($recip =~ /.*-info\@.*/) ||
+	   ($recip =~ /.*-index.*) | ($recip =~ /.*-unsubscribe-.*/))
 	{
 	    $recip =~ s!-.*\@!\@!;
 	}
@@ -119,60 +166,40 @@ while(! eof(STDIN) ) {
 	    $first = `echo $begin{$msgnr} | /usr/local/bin/tailocal`;
 	    chomp($first);
 	}
+
+	$deliveries{'LOCAL'}++;
     } elsif($line =~ / starting delivery .*:.* to remote /) {
-	# 2003-05-28 00:19:39.449583 starting delivery 2478: msg 161215 to remote baby6@3333.3utilities.com
-	#
-	# 1054100604.173939 starting delivery 100: msg 161212 to remote 9l2zrhnxlifz@loyus.com
-	# Get the msg number
-	if($line =~ /^20[0-9][0-9]-.*/) {
-	    # Human readable
-	    $msgnr =  (split(' ', $line))[4];
-	} else {
-	    # Unix std time
-	    $msgnr =  (split(' ', $line))[3];
-	}
-	$msgnr =~ s/:$//;
+	$msgnr = &get_msg_nr($line, 3);
 	next if(!$msgnr);
 
-	$remote{'TOP'}++; $remote{$domain}++ if($domain);
-    } elsif($line =~ / delivery .*: deferral: /) {
-	# 2003-05-28 00:37:24.417470 delivery 2518: deferral: Sorry,_I_couldn't_find_any_host_by_that_name._(#4.1.2)/
-	# Failed delivery
-
-	$remote{'TOP'}--; $remote{$domain}-- if($domain);
-	$bounce{'TOP'}++; $bounce{$domain}++ if($domain);
-    } elsif($line =~ / delivery .*: success: did/) {
-	# 1054096268.233525 delivery 2: success: did_0+0+1/
-	#
-	# 2003-05-28 00:20:28.052708 delivery 2479: success: did_0+0+1/
-
-	# Get the msg number
-	if($line =~ /^20[0-9][0-9]-.*/) {
-	    # Human readable
-	    $msgnr   = (split(' ', $line))[3];
-	} else {
-	    # Unix std time
-	    $msgnr   = (split(' ', $line))[2];
-	}
-	$msgnr =~ s/:$//;
+	$deliveries{'REMOTE'}++;
+#    } elsif($line =~ / info msg .*: bytes .* from .* qp .* uid .*/) {
+#	if($line =~ /^20[0-9][0-9]-.*/) {
+#	    # Human readable
+#	    $from =  (split(' ', $line))[8];
+#	} else {
+#	    # Unix std time
+#	    $from =  (split(' ', $line))[7];
+#	}
+#	$from =~ s/\<//;
+#	$from =~ s/\>//;
+#
+#	$from_domain = (split('\@', $from))[1];
+    } elsif($line =~ / delivery .*: success: /) {
+	$msgnr = &get_msg_nr($line, 2);
+	next if(!$msgnr);
 
 	# Get the time
 	$end{$msgnr} = &get_time($line);
+    } elsif($line =~ / delivery .*: failure: /) {
+	# Failed delivery
+	$deliveries{'FAILED'}++;
+    } elsif($line =~ / delivery .*: deferral: /) {
+	# Failed remote delivery
+	$deliveries{'FAILED'}++;
     }
 
-    if($i >= 100) {
-	if(($begin{$msgnr} && !$end{$msgnr}) && $DEBUG) {
-	    # Just make sure we get the end time/date for the
-	    # last delivery (so the stats isn't cut of with
-	    # a start delivery, but we don't get the END of
-	    # the delivery).
-	    $i=99;
-	} else {
-	    goto LOOP;
-	}
-    }
-
-    $i++ if($DEBUG);
+    $i++;
 }
 exit(0) if(!$msgnr); # We have no statistics - exit
 
@@ -181,8 +208,7 @@ LOOP:
     $last = `echo $end{$msgnr} | /usr/local/bin/tailocal`;
     chomp($last);
 
-    $high = 0; $i = 0; $avg = 0;
-
+    $high = $avg = 0;
     foreach $nr (sort { $begin{$a} <=> $begin{$b} } keys(%begin)) {
 	# Get start and end time of delivery
 	$time1 = `echo $begin{$nr} | /usr/local/bin/tailocal`;
@@ -198,26 +224,20 @@ LOOP:
 	
 	printf("%5d: $time1 - $time2 (%3d sec) -> $dest{$nr}\n", $nr, $time3)
 	    if($allstats && !$quiet);
-	$i++;
     }
 
     # Output the statistics
-    if(!$quiet) {
+    if(!$quiet && !$DOMAIN) {
 	print "\n" if($allstats);
-	print "Status between '$first' and '$last'\n";
-	printf("Highest time of delivery:           %5d\n", $high);
-	printf("Average delivery time:              %5d\n", $avg/$i);
+	print "Status between '$first' and '$last'.\n";
+	printf("Highest time of delivery:                         %5d\n", $high);
+	printf("Average delivery time:                            %5d\n", $avg/($deliveries{'LOCAL'}+$deliveries{'REMOTE'}));
 	print "\n";
 
-	if(!$DOMAIN) {
-	    printf("Number of LOCAL deliveries:         %5d\n", $i);
-	    printf("Number of REMOTE deliveries:        %5d\n", $remote{'TOP'});
-	    printf("Bounces or failed deliveries:       %5d\n", $bounce{'TOP'});
-	} else {
-	    printf("Number of LOCAL deliveries:         %5d\n", $delivery{$DOMAIN}->{'TOP'});
-	    printf("Number of REMOTE deliveries:        %5d\n", $remote{$DOMAIN});
-	    printf("Bounces or failed deliveries:       %5d\n", $bounce{$DOMAIN});
-	}
+	printf("Number of (successfull) deliveries:\n");
+	printf("  %-47s %5d\n", 'Local:', $deliveries{'LOCAL'});
+	printf("  %-47s %5d\n", 'Remote:', $deliveries{'REMOTE'});
+	printf("  %-47s %5d\n", 'Bounces or failed deliveries:', $deliveries{'FAILED'});
 	print "\n";
     }
 
@@ -225,14 +245,14 @@ LOOP:
 	if($DOMAIN) {
 	    if($quiet) {
 		# in out bounce
-		print "$delivery{$DOMAIN}->{'TOP'} $remote{$DOMAIN} $bounce{$DOMAIN}";
+		print "$delivery{$DOMAIN}->{'TOP'} $deliveries{'REMOTE'} $deliveries{'FAILED'}";
 	    } else {
-		printf("Domain: %-27s %5d\n", $DOMAIN, $delivery{$DOMAIN}->{'TOP'});
+		printf("Domain: %-27s               %5d\n", $DOMAIN, $delivery{$DOMAIN}->{'TOP'});
 		
 		# Dereference the two-dimensional array.
 		foreach $recip (sort keys(%{ $delivery{$DOMAIN} })) {
 		    if($recip ne 'TOP') {
-			printf("        %-27s %5d\n", $recip, $delivery{$DOMAIN}->{$recip});
+			printf("        %-27s               %5d\n", $recip, $delivery{$DOMAIN}->{$recip});
 		    }
 		}
 		
@@ -241,12 +261,12 @@ LOOP:
 	} else {
 	    if(!$quiet) {
 		foreach $domain (sort keys(%delivery)) {
-		    printf("Domain: %-27s %5d\n", $domain, $delivery{$domain}->{'TOP'});
+		    printf("Domain: %-27s               %5d\n", $domain, $delivery{$domain}->{'TOP'});
 		    
 		    # Dereference the two-dimensional array.
 		    foreach $recip (sort keys(%{ $delivery{$domain} })) {
 			if($recip ne 'TOP') {
-			    printf("        %-27s %5d\n", $recip, $delivery{$domain}->{$recip});
+			    printf("        %-27s               %5d\n", $recip, $delivery{$domain}->{$recip});
 			}
 		    }
 		    
