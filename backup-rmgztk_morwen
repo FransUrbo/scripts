@@ -1,6 +1,8 @@
 #!/bin/sh
 
-# $Id: backup-rmgztk_morwen,v 1.12 2002-11-10 10:43:55 turbo Exp $
+# $Id: backup-rmgztk_morwen,v 1.13 2002-11-10 10:55:58 turbo Exp $
+#
+# Backup script for host: %HOST%
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
