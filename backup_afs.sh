@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.23 2003-08-27 15:40:20 turbo Exp $
+# $Id: backup_afs.sh,v 1.24 2003-10-10 10:26:34 turbo Exp $
 
 cd /
 
@@ -179,6 +179,8 @@ do_backup () {
 
 	    [ ! -z "$verbose" ] && echo "Backing up volume:"
 
+	    echo "  $volume: start = " `date +"%Y%m%d %H:%M:%S"` ; START=`date +"%s"`
+
 	    if [ ! -z "$action" ]; then
 		printf "%s\n" $volume
 	    else
@@ -354,6 +356,11 @@ do_backup () {
 		
 		[ ! -z "$action" -o ! -z "$verbose" ] && echo '-----'
 	    fi
+
+	    echo "  $volume: end   = " `date +"%Y%m%d %H:%M:%S"` ; END=`date +"%s"`
+	    SEC=`expr $END - $START` ; MIN=`expr $SEC / 60`
+	    echo "  $volume: took  = $SEC sec (~$MIN min)"
+	    echo
 	fi
     done
 }
