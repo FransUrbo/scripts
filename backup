@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.27 2004-02-03 06:29:06 turbo Exp $
+# $Id: backup,v 1.28 2004-03-03 07:37:53 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -206,15 +206,4 @@ if [ -x /usr/local/sbin/backup_afs.sh ]; then
     fi
 
     echo "Ending AFS volume backup at" `date +"%Y%m%d %H:%M:%S"`
-    echo
 fi
-
-if [ "$BACKUP_TYPE" == "incr" ]; then
-    # Do a INCREMENTAL backup to tape
-    incr_backup -d
-elif [ "$BACKUP_TYPE" == "full" ]; then
-    # Do a FULL backup to tape
-    full_backup -d
-fi
-echo
-
