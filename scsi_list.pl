@@ -15,40 +15,41 @@ sub scsi_target() {
 }
 
 # ------------------------------------
-open(MDSTAT, "/proc/mdstat") || die "Can't open cat /proc/mdstat, $!\n";
-while(! eof(MDSTAT)) {
-    $line = <MDSTAT>; chomp($line);
-    if($line =~ /^md/) {
-	$dev_md = (split(' ', $line))[0];
-	open(MDADM, "mdadm -D /dev/$dev_md |") || die "Can't mdadm /dev/$dev_md, $!\n";
-	while(! eof(MDADM)) {
-	    $line = <MDADM>; chomp($line);
-	    undef($dev_raid); undef($dev_type);
-
-	    if($line =~ /active sync/) {
-		$dev_raid = (split(' ', $line))[6];
-		$dev_type = '';
+if(open(MDSTAT, "/proc/mdstat")) {
+    while(! eof(MDSTAT)) {
+	$line = <MDSTAT>; chomp($line);
+	if($line =~ /^md/) {
+	    $dev_md = (split(' ', $line))[0];
+	    open(MDADM, "mdadm -D /dev/$dev_md |") || die "Can't mdadm /dev/$dev_md, $!\n";
+	    while(! eof(MDADM)) {
+		$line = <MDADM>; chomp($line);
+		undef($dev_raid); undef($dev_type);
+		
+		if($line =~ /active sync/) {
+		    $dev_raid = (split(' ', $line))[6];
+		    $dev_type = '';
 # Not really intresting - all are active, unless they aren't something
 # else - such as 'spare' :)
-#		$dev_type = '/active';
-	    } elsif($line =~ /spare/) {
-		$dev_raid = (split(' ', $line))[5];
-		$dev_type = '/spare';
-#	    } elsif($line =~ /removed$/) {
+#		    $dev_type = '/active';
+		} elsif($line =~ /spare/) {
+		    $dev_raid = (split(' ', $line))[5];
+		    $dev_type = '/spare';
+#		} elsif($line =~ /removed$/) {
 #       8       0        0       -1      removed
-#		$dev_raid = (split(' ', $line))[5];
+#		    $dev_raid = (split(' ', $line))[5];
+		}
+		
+		if($dev_raid) {
+		    ($ctrl, $id) = &scsi_target($dev_raid);
+		    $MD{$ctrl}{$id} = $dev_md;
+		    $MD_TYPE{$ctrl}{$id} = $dev_type;
+		}
 	    }
-
-	    if($dev_raid) {
-		($ctrl, $id) = &scsi_target($dev_raid);
-		$MD{$ctrl}{$id} = $dev_md;
-		$MD_TYPE{$ctrl}{$id} = $dev_type;
-	    }
+	    close(MDADM);
 	}
-	close(MDADM);
     }
+    close(MDSTAT);
 }
-close(MDSTAT);
 
 # ------------------------------------
 open(SCSI, "/proc/scsi/scsi") || die "Can't open /proc/scsi/scsi, $!\n";
