@@ -1,0 +1,132 @@
+#!/bin/sh
+
+DATE=`date +"%Y%m%d"`
+BACKUPDIR=/var/.backups
+BACKUPFILE1=$BACKUPDIR/System/confs-$DATE.tar.bz2
+BACKUPFILE2=$BACKUPDIR/OpenLDAP/slapd-$DATE.ldif.bz2
+BACKUPFILE3=$BACKUPDIR/KerberosV/krb5-$DATE
+BACKUPFILE4=$BACKUPDIR/OpenAFS/afsd-$DATE.gz
+BACKUPFILE5=/etc/dpkg/selections-$DATE
+BACKUPFILE6=$BACKUPDIR/Important/important-$DATE.tar.bz2
+BACKUPFILE7=$BACKUPDIR/Logs/oldlogs-$DATE.tar.bz2
+BACKUPFILE8=$BACKUPDIR/AFBackup/afbackup_var-$DATE.tar.bz2
+BACKUPFILE9=$BACKUPDIR/PostgreSQL/postgresql-$DATE.sql.bz2
+BACKUPFILES="$BACKUPFILE1 $BACKUPFILE2 $BACKUPFILE3.gz $BACKUPFILE4 $BACKUPFILE6 $BACKUPFILE7 $BACKUPFILE9"
+BACKUPVOLDIR="/var/.backups-volumes" # Make sure this is the same dir as
+				     # configured in /usr/local/sbin/backup_afs.sh
+
+$ Id: $
+
+cd /
+
+# ----- L D A P -----
+/etc/init.d/slapd.backup stop > /dev/null 2>&1
+slapcat -n /var/lib/ldap.backup/COM/id2entry.dbb | \
+    egrep -v '^replace:' | \
+    bzip2 > $BACKUPFILE2
+/etc/init.d/slapd.backup start > /dev/null 2>&1
+
+# ----- K E R B E R O S -----
+kdb5_util dump $BACKUPFILE3
+if [ -f $BACKUPFILE3.dump_ok ]; then
+    gzip -f9 $BACKUPFILE3
+    rm $BACKUPFILE3.dump_ok
+else
+    echo "Could not dump krb5 db to $BACKUPFILE3!"
+fi
+
+# ----- A F S -----
+DIR=etc/openafs
+if [ -d "$DIR" ]; then
+    cd /  && tar cjpf $BACKUPFILE4 \
+	$DIR/CellServDB $DIR/afs.conf* $DIR/ThisCell \
+	$DIR/server $DIR/cacheinfo
+fi
+
+# ----- P O S T G R E S Q L -----
+TMPFILE=`tempfile -p psql.` ; chown postgres $TMPFILE
+su postgres -c "/usr/lib/postgresql/bin/pg_dumpall -c > $TMPFILE"
+cat $TMPFILE | bzip2 > $BACKUPFILE9
+rm -f $TMPFILE
+
+# ----- I M P O R T A N T   C O N F I G F I L E S -----
+dpkg --get-selections | gzip -f9 > $BACKUPFILE5
+tar cjpsf $BACKUPFILE1 `find etc/ldap etc/krb5* etc/lvm* \
+    etc/roxen2 etc/pam.d etc/bind etc/{libnss-,pam_}ldap.conf \
+    etc/auto.master etc/hosts* etc/qmail etc/tcp.{smtp,qmqp} \
+    etc/{nsswitch,squid,watchdog,danted,firewall.block,firewall}.conf \
+    usr/lib/squid/ldap_auth.alan_sparks etc/apache etc/cron* \
+    etc/init.d/{qmail,slapd,slapd.backup,firewall} etc/profile \
+    etc/logcheck/ignore.d.server/papadoc etc/xinetd.d etc/courier \
+    etc/krb5.keytab* etc/postgresql/{pg_hba,postgresql}.conf \
+    $BACKUPFILE5 -type f | egrep -v '~$' | \
+    sed -e 's@^/@@' -e 's@\.dpkg-dist@@' | sort`
+
+# -----------------
+# AFBackup var directory for easy restore incase of crash
+DIR="var/lib/afbackup etc/afbackup" ; X=
+for dir in $DIR; do
+    if [ -d $dir ]; then
+	X="$X $dir"
+    fi
+done
+tar cjpsf $BACKUPFILE8 $X
+
+# -----------------
+# Some important files...
+kinit -l 4m -k -t /etc/krb5.keytab.webserver webserver@BAYOUR.COM && aklog
+mkdir /tmp/$$ && ( \
+    cd /var/www/bayour && cp LDAPv3-HOWTO.html /tmp/$$; \
+    find kerberos openldap | cpio -p /tmp/$$ 2> /dev/null; \
+) && cd /tmp/$$ && tar cjpsf $BACKUPFILE6 . && rm -R /tmp/$$
+# These have moved into /afs/bayour. How do we do a backup?? TODO
+#    cd secret && cp Implementing_LDAPv3.sdw /tmp/$$; \
+#    find LDAPv3 -type f -exec ls -ln {} \; > /tmp/$$/LDAPv3_install.filelist; \
+kdestroy
+
+# -----------------
+# Logfiles...
+cd /var/log && tar --remove-files -cjf $BACKUPFILE7 `find -name '*.gz'`
+
+# -----------------
+for file in $BACKUPFILES; do
+    chgrp backup $file
+    chmod 640    $file
+done
+rm -f $BACKUPFILE5
+
+# -----------------
+# Backup the AFS volumes
+if [ -x /usr/local/sbin/backup_afs.sh ]; then
+    # Do we backup odd or even weeks?
+    ODD=`expr \`date +"%V"\` % 2`
+    DAY=`date +"%w"`
+    if [ "$DAY" == "1" ]; then
+	# This is a monday, clean the backup directory. We'll
+	# have PREVIOUS weeks backup(s) intact -> At least one
+	# weeks of backup(s) online.
+
+# Unfortunatly I don't have enough space on my backup partition
+# to save two full weeks, therefor I'm deleting ALL backups, and
+# start over. HOPFULLY it's saved to tape by now...
+#
+# If you HAVE enough room for two full weeks, uncomment the if/else/fi
+# lines below.
+#	if [ "$ODD" != "1" ]; then
+	    # Odd weeks
+	    rm -f $BACKUPVOLDIR/odd/*
+#	else
+	    # Even weeks
+	    rm -f $BACKUPVOLDIR/even/*
+#	fi
+
+	# Do a FULL backup
+	/usr/local/sbin/backup_afs.sh 2>&1
+    else
+	# Do a INCREMENTAL volume backup
+	/usr/local/sbin/backup_afs.sh -i 2>&1
+    fi
+fi
+
+# Do a INCREMENTAL backup to tape
+incr_backup -d
