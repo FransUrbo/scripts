@@ -1,9 +1,9 @@
-# $Id: Makefile,v 1.35 2005-02-21 08:15:43 turbo Exp $
+# $Id: Makefile,v 1.36 2005-04-01 10:02:56 turbo Exp $
 
 sBIN		= /afs/bayour.com/common/noarch/sbin
 uBIN		= /afs/bayour.com/common/noarch/bin
 sBINARIES	= backup_afs.sh update_afs.sh salvage_afs.sh qmail-runq qmail-stats.pl convert_openldap_db.pl change_openldap_db_layout.pl create_cert.sh ldapadduser.sh qmail-qclean.sh qmail-smtpd-summary.pl qmail-summary.pl modify_ldap_database.pl scsi_list.pl scsi_reset.sh
-uBINARIES	= df_afs.pl list_afs_vols.sh idn.sh build-latest-spamassassin.sh cvs-rsh
+uBINARIES	= df_afs.pl list_afs_vols.sh idn.sh build-latest-spamassassin.sh cvs-rsh create_htmls.pl create_thumbs.pl
 
 install all:	clean
 	@(for file in $(sBINARIES) ; do \
