@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.2 2002-08-29 08:51:57 turbo Exp $
+# $Id: backup_afs.sh,v 1.3 2002-09-15 12:49:18 turbo Exp $
 
 cd /
 
@@ -247,7 +247,7 @@ fi
 
 # --------------
 # Get the CLI options...
-TEMP=`getopt -o heuimc --long help,echo,users,incr,mount,nocreate-vol -- "$@"`
+TEMP=`getopt -o heuimcv --long help,echo,users,incr,mount,nocreate-vol,verbose -- "$@"`
 eval set -- "$TEMP"
 while true ; do
     case "$1" in
