@@ -55,5 +55,7 @@ for part in $PARTITIONS; do
 	    printf "%s;%s;%s;%s;%s;%d%s;%s\n" $dev $part $1 $2 $3 $4 $5 $6
 	fi
     done
+
+    [ -z "$NOFORMAT" ] && echo
 done
 
