@@ -1,15 +1,17 @@
-# $Id: Makefile,v 1.21 2004-01-13 06:59:59 turbo Exp $
+# $Id: Makefile,v 1.22 2004-01-13 07:18:52 turbo Exp $
 
-sBINARIES="backup_afs.sh update_afs.sh salvage_afs.sh qmail-runq qmail-stats.pl convert_openldap_db.pl change_openldap_db_layout.pl create_cert.sh"
-uBINARIES="df_afs.pl list_afs_vols.sh idn.sh"
+sBIN		= /afs/bayour.com/common/noarch/sbin
+uBIN		= /afs/bayour.com/common/noarch/bin
+sBINARIES	= backup_afs.sh update_afs.sh salvage_afs.sh qmail-runq qmail-stats.pl convert_openldap_db.pl change_openldap_db_layout.pl create_cert.sh
+uBINARIES	= df_afs.pl list_afs_vols.sh idn.sh
 
 install all:	clean
 	@(cp -v backup /sbin/backup-`hostname`; \
 	  for file in $(sBINARIES) ; do \
-	    cp -v $$file /afs/bayour.com/common/noarch/sbin/; \
+	    cp -v $$file $(sBIN)/; \
 	  done; \
 	  for file in $(uBINARIES) ; do \
-	    cp -v $$file /afs/bayour.com/common/noarch/bin/; \
+	    cp -v $$file $(uBIN)/; \
 	  done; \
 	  for host in rmgztk morwen ; do \
 	    echo -n "\`backup-rmgztk_morwen' -> \`$$host:/sbin/backup-$$host'"; \
@@ -34,3 +36,11 @@ install all:	clean
 
 clean:
 	@rm -f *~ .#*
+
+$(sBINARIES): dummy
+	@cp -v $@ $(sBIN)
+
+$(uBINARIES): dummy
+	@cp -v $@ $(uBIN)
+
+dummy:
