@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup-rmgztk_morwen,v 1.13 2002-11-10 10:55:58 turbo Exp $
+# $Id: backup-rmgztk_morwen,v 1.14 2002-11-23 09:35:20 turbo Exp $
 #
 # Backup script for host: %HOST%
 
@@ -9,7 +9,9 @@ BACKUPDIR=/var/.backups
 HOSTNAME=`hostname`
 
 BACKUPFILE1=$BACKUPDIR/System/$HOSTNAME-confs-$DATE.tar.bz2
-BACKUPFILE2=$BACKUPDIR/OpenLDAP/$HOSTNAME-slapd-$DATE.ldif.bz2
+if [ -f /etc/init.d/slapd.backup ]; then
+    BACKUPFILE2=$BACKUPDIR/OpenLDAP/$HOSTNAME-slapd-$DATE.ldif.bz2
+fi    
 BACKUPFILE3=$BACKUPDIR/KerberosV/$HOSTNAME-krb5-$DATE
 BACKUPFILE5=/etc/dpkg/selections-$DATE.gz
 BACKUPFILE7=$BACKUPDIR/Logs/$HOSTNAME-oldlogs-$DATE.tar.bz2
