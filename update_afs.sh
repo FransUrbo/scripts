@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: update_afs.sh,v 1.8 2002-08-30 05:13:07 turbo Exp $
+# $Id: update_afs.sh,v 1.9 2002-08-31 11:24:51 turbo Exp $
 
 cd /
 
@@ -8,6 +8,28 @@ cd /
 # Set some default variables
 AFSSERVER="papadoc.bayour.com"
 AFSCELL="bayour.com"
+
+# --------------
+replicated () {
+    rw=$1 ; ro=$rw\.readonly
+
+    set -- `vos examine $rw $LOCALAUTH -encrypt | grep 'Last Update'`
+    shift ; shift
+    time1=`date -d "$*" "+%s"`
+
+    set -- `vos examine $ro $LOCALAUTH -encrypt | grep 'Last Update'`
+    shift ; shift
+    time2=`date -d "$*" "+%s"`
+
+    [ ! -z "$verbose" ] && printf "Vol: %-25s - $time1 ; $time2 => " $rw
+    if [ $time1 -ge $time2 ]; then
+	[ ! -z "$verbose" ] && echo "Needs to be released."
+	return 1
+    else
+	[ ! -z "$verbose" ] && echo "no need for release."
+	return 0
+    fi
+}
 
 # --------------
 # 'Initialize' AFS access...
@@ -57,16 +79,29 @@ if [ "$search" != "" ]; then
     search="^(`echo $search | sed -e 's@ @\\\..*\\\.readonly|^@' -e 's@\$@\\\..*\\\.readonly@'`).*RO.*"
 
     # Get all the volumes contain the search criteria
-    VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH | egrep "$search" | sed -e 's@\.readonly.*@@'`
+    VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH -encrypt | egrep "$search" | sed -e 's@\.readonly.*@@'`
 else
     if [ -z "$VOLUMES" ]; then
-	VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH | grep readonly | sed -e 's@\ .*@@' -e 's@\.readonly@@'`
+	VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH -encrypt | grep readonly | sed -e 's@\ .*@@' -e 's@\.readonly@@'`
     fi
 fi
 VOLUMES=`echo $VOLUMES`
 
+# --------------
+# Which of these should REALLY be released?
+# Look in the 'Last Update' line of 'vos examine'.
+#
+# If the RW volume is _NEWER_ than the RO, then replicate!
+for vol in $VOLUMES; do
+    if ! replicated $vol; then
+	RELEASE="$RELEASE $rw"
+    fi
+done
+VOLUMES="`echo $RELEASE | sed 's@^\ @@'`"
+
 if [ ! -z "$test" ]; then
-    echo "Volumes to release: $VOLUMES"
+    [ ! -z "$verbose" ] && spcs="             "
+    echo "Volumes to release: $spcs$VOLUMES"
     exit 0
 fi
 
@@ -74,10 +109,10 @@ for vol in $VOLUMES; do
     if [ ! -z "$verbose" ]; then
     	echo "-----------"
 	echo -n "Releasing volume: "
-	vos release $vol $LOCALAUTH $verbose
+	vos release $vol $LOCALAUTH $verbose -encrypt
 	echo
     else
-	RES=`vos release $vol $LOCALAUTH 2>&1`
+	RES=`vos release $vol $LOCALAUTH -encrypt 2>&1`
     fi
 
     res=$?
