@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.31 2004-09-18 09:00:32 turbo Exp $
+# $Id: Makefile,v 1.32 2004-10-31 10:22:28 turbo Exp $
 
 sBIN		= /afs/bayour.com/common/noarch/sbin
 uBIN		= /afs/bayour.com/common/noarch/bin
@@ -42,6 +42,7 @@ install all:	clean
 	  rcp -x kprop.sh root@aurora:/usr/sbin; \
 	  rcp -x backup root@aurora:/sbin/backup-`hostname`; \
 	  cp cron.weekly /etc/cron.weekly/backup; \
+	  cp update_{incoming,packages}.sh /home/ftp/bin/; \
 	  echo)
 
 clean:
