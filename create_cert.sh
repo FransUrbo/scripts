@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: create_cert.sh,v 1.1 2004-01-13 06:59:59 turbo Exp $
+# $Id: create_cert.sh,v 1.2 2004-01-13 07:03:14 turbo Exp $
 
 if [ -z "$ALIAS_NAME1" -o -z "$ALIAS_NAME2" ]; then
     echo "Please set the variables ALIAS_NAME1, ALIAS_NAME2!"
@@ -22,7 +22,7 @@ rm server_req.pubkey
 chmod 644 server.privkey server.pubkey
 
 FILENAME=`egrep 'Subject:.*CN=' server.pubkey | sed -e 's@.*CN=@@' -e 's@/.*@@' -e 's@\.@_@'`
-cat server.privkey server.pubkey > $FILENAME.pem
+cat server.pubkey server.privkey > $FILENAME.pem
 mv server.privkey $FILENAME.prv
 mv server.pubkey $FILENAME.pub
 
