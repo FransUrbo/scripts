@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.32 2004-10-31 10:22:28 turbo Exp $
+# $Id: Makefile,v 1.33 2004-12-22 13:16:54 turbo Exp $
 
 sBIN		= /afs/bayour.com/common/noarch/sbin
 uBIN		= /afs/bayour.com/common/noarch/bin
@@ -8,7 +8,7 @@ uBINARIES	= df_afs.pl list_afs_vols.sh idn.sh build-latest-spamassassin.sh cvs-r
 install all:	clean
 	@(for file in $(sBINARIES) ; do \
 	    cp -v $$file $(sBIN)/; \
-	    for host in aurora morwen ; do \
+	    for host in aurora rmgztk; do \
 	      echo -n "\`$$file' -> \`$$host:/usr/local/sbin/'"; \
 	      rcp -x $$file root@$$host:/usr/local/sbin/; \
 	      echo; \
@@ -16,13 +16,13 @@ install all:	clean
 	  done; \
 	  for file in $(uBINARIES) ; do \
 	    cp -v $$file $(uBIN)/; \
-	    for host in aurora morwen ; do \
+	    for host in aurora rmgztk; do \
 	      echo -n "\`$$file' -> \`$$host:/usr/local/bin/'"; \
 	      rcp -x $$file root@$$host:/usr/local/bin/; \
 	      echo; \
 	    done; \
 	  done; \
-	  for host in aurora morwen ; do \
+	  for host in aurora rmgztk; do \
 	    echo -n "\`backup-rmgztk_morwen' -> \`$$host:/sbin/backup-$$host'"; \
 	    sed -e "s@%DIRS%@`cat .dirs-$$host`@" backup-rmgztk_morwen \
 	        -e "s@%HOST%@$$host@" > .TMPFILE; \
