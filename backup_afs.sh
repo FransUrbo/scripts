@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.12 2002-10-14 07:04:50 turbo Exp $
+# $Id: backup_afs.sh,v 1.13 2002-10-28 14:28:38 turbo Exp $
 
 cd /
 
@@ -201,8 +201,22 @@ do_backup () {
 			    fi
 			fi
 		    fi
-		elif echo $RES | grep -q 'Volume needs to be salvaged'; then
+		elif echo $RES | grep -q 'Volume needs to be salvaged' ||
+		     echo $RES | grep -q 'Could not re-clone backup volume'
+		then
+		    # ERROR
+		    # We might get the following error from this:
+		    #
+		    #[papadoc.root]# vos backup user.malin -localauth
+		    #Could not re-clone backup volume 536871049
+		    #: Invalid argument
+		    #Error in vos backup command.
+		    #: Invalid argument
+		    #
+		    #[papadoc.pts/6]$ tail -f /var/log/openafs/VolserLog -n0
+		    #Mon Oct 28 09:47:53 2002 1 Volser: Clone: The "recloned" volume must be a read only volume; aborted
 		    # FAILED - salvage volume
+
 		    echo "Trying to salvage the volume so we can try again"
 		    bos salvage -server ${AFSSERVER:-localhost} -partition $PART -volume $volume -localauth
 		fi
