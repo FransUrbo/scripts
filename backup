@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.26 2004-01-12 10:02:13 turbo Exp $
+# $Id: backup,v 1.27 2004-02-03 06:29:06 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -17,11 +17,19 @@ BACKUPFILES="$BACKUPFILE1 $BACKUPFILE2 $BACKUPFILE4 $BACKUPFILE6 $BACKUPFILE7 $B
 BACKUPVOLDIR="/var/.backups-volumes" # Make sure this is the same dir as
 				     # configured in /usr/local/sbin/backup_afs.sh
 
+# --------------
+# Do a full backup every sunday
+DAY=`date +"%w"`
+if [ "$DAY" = "7" ]; then
+    BACKUP_TYPE=full
+else
+    BACKUP_TYPE=incr
+fi
+
 cd /
 
 # --------------
 # Get the CLI options...
-BACKUP_TYPE=incr
 if [ ! -z "$@" ]; then
     TEMP=`getopt -o hif --long help,incr,full -- "$@"`
     eval set -- "$TEMP"
@@ -168,9 +176,9 @@ echo
 if [ -x /usr/local/sbin/backup_afs.sh ]; then
     echo "Starting AFS volume backup at" `date +"%Y%m%d %H:%M:%S"`
 
-    # Do we backup odd or even weeks?
     ODD=`expr \`date +"%V"\` % 2`
-    DAY=`date +"%w"`
+
+    # Do we backup odd or even weeks?
     if [ "$DAY" = "1" -o "$BACKUP_TYPE" == "full" ]; then
 	# This is a monday (or we've specified full backup), clean
 	# the backup directory. We'll have PREVIOUS weeks backup(s)
