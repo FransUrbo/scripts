@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup-rmgztk_morwen,v 1.10 2002-10-03 10:31:12 turbo Exp $
+# $Id: backup-rmgztk_morwen,v 1.11 2002-10-03 11:06:28 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -9,7 +9,7 @@ HOSTNAME=`hostname`
 BACKUPFILE1=$BACKUPDIR/System/$HOSTNAME-confs-$DATE.tar.bz2
 BACKUPFILE2=$BACKUPDIR/OpenLDAP/$HOSTNAME-slapd-$DATE.ldif.bz2
 BACKUPFILE3=$BACKUPDIR/KerberosV/$HOSTNAME-krb5-$DATE
-BACKUPFILE5=/etc/dpkg/selections-$DATE
+BACKUPFILE5=/etc/dpkg/selections-$DATE.gz
 BACKUPFILE7=$BACKUPDIR/Logs/$HOSTNAME-oldlogs-$DATE.tar.bz2
 
 BACKUPFILES="$BACKUPFILE1 $BACKUPFILE2 $BACKUPFILE3.bz2 $BACKUPFILE7"
@@ -41,7 +41,7 @@ else
 fi
 
 # ----- I M P O R T A N T   C O N F I G F I L E S -----
-dpkg --get-selections \* | gzip -f9 > $BACKUPFILE5
+dpkg --get-selections \* | sort | gzip -f9 > $BACKUPFILE5
 tar cjpsf $BACKUPFILE1 `find etc/ldap etc/krb5* \
     etc/pam.d var/lib/named/etc/bind etc/hosts* \
     etc/qmail etc/tcp.smtp etc/cron* etc/apache \
