@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: update_afs.sh,v 1.2 2002-08-29 08:52:30 turbo Exp $
+# $Id: update_afs.sh,v 1.3 2002-08-29 08:54:27 turbo Exp $
 
 cd /
 
@@ -8,7 +8,18 @@ cd /
 # Set some default variables
 AFSSERVER="papadoc.bayour.com"
 AFSCELL="bayour.com"
-#LOCALAUTH="-localauth"
+
+# --------------
+# 'Initialize' AFS access...
+if ! tokens | grep -q ^User; then
+    ID=`id -u`
+    if [ "$ID" != "0" ]; then
+	echo "You must have a valid AFS token to do a backup (or be root)." > /dev/stderr
+	exit 1
+    else
+	LOCALAUTH="-localauth"
+    fi
+fi
 
 # --------------
 # Get the CLI options...
