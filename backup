@@ -15,7 +15,7 @@ BACKUPFILES="$BACKUPFILE1 $BACKUPFILE2 $BACKUPFILE3.gz $BACKUPFILE4 $BACKUPFILE6
 BACKUPVOLDIR="/var/.backups-volumes" # Make sure this is the same dir as
 				     # configured in /usr/local/sbin/backup_afs.sh
 
-$ Id: $
+# $ Id: $
 
 cd /
 
