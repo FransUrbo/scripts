@@ -1,5 +1,5 @@
 BAYOUR-COM-MIB DEFINITIONS ::= BEGIN
--- $Id: BAYOUR-COM-MIB.txt,v 1.2 2005-04-01 12:40:42 turbo Exp $
+-- $Id: BAYOUR-COM-MIB.txt,v 1.3 2005-04-01 12:42:27 turbo Exp $
 
 IMPORTS
     MODULE-IDENTITY, OBJECT-TYPE,
@@ -17,7 +17,7 @@ bayourcom MODULE-IDENTITY
        E-Mail:   turbo@bayour.com"
     DESCRIPTION  "The MIB module defines the Bayour.COM Bind9 statistics"
 
-    REVISION     "200504011437" -- April 1, 2005 - 14:37
+    REVISION     "200504011437Z" -- April 1, 2005 - 14:37
     DESCRIPTION  "Changed recursive to recursion;
                   Changed failed to failure;
                   This according to original Bind9 definitions."
