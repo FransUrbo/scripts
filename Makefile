@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.27 2004-09-16 05:22:01 turbo Exp $
+# $Id: Makefile,v 1.28 2004-09-16 05:24:23 turbo Exp $
 
 sBIN		= /afs/bayour.com/common/noarch/sbin
 uBIN		= /afs/bayour.com/common/noarch/bin
@@ -13,7 +13,7 @@ install all:	clean
 	  for file in $(uBINARIES) ; do \
 	    cp -v $$file $(uBIN)/; \
 	  done; \
-	  for host in rmgztk morwen ; do \
+	  for host in aurora morwen ; do \
 	    echo -n "\`backup-rmgztk_morwen' -> \`$$host:/sbin/backup-$$host'"; \
 	    sed -e "s@%DIRS%@`cat .dirs-$$host`@" backup-rmgztk_morwen \
 	        -e "s@%HOST%@$$host@" > .TMPFILE; \
@@ -29,8 +29,8 @@ install all:	clean
 	    rcp -x test-smtp.pl root@$$host:/usr/sbin/; \
 	    echo; \
 	  done; \
-	  echo -n "\`kprop.sh' -> \`rmgztk:/usr/sbin/'"; \
-	  rcp -x kprop.sh root@rmgztk:/usr/sbin; \
+	  echo -n "\`kprop.sh' -> \`aurora:/usr/sbin/'"; \
+	  rcp -x kprop.sh root@aurora:/usr/sbin; \
 	  cp cron.weekly /etc/cron.weekly/backup; \
 	  echo)
 
