@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: update_afs.sh,v 1.15 2003-10-22 05:31:00 turbo Exp $
+# $Id: update_afs.sh,v 1.16 2003-10-25 14:51:06 turbo Exp $
 
 cd /
 
@@ -72,7 +72,7 @@ while true ; do
 	-u|--users)	search="$search user"   ; shift ;;
 	-v|--verbose)	verbose="-verbose"	; shift ;;
 	-V|--version)
-	    set -- `echo "$Id: update_afs.sh,v 1.15 2003-10-22 05:31:00 turbo Exp $"`
+	    set -- `echo "$Id: update_afs.sh,v 1.16 2003-10-25 14:51:06 turbo Exp $"`
 	    echo "Version: $3"
 	    exit 0
 	    ;;
@@ -116,7 +116,7 @@ fi
 
 for vol in $VOLUMES; do
     if [ ! -z "$verbose" ]; then
-	set -- `vos examine $vol | head -n1` ; SIZE=$4
+	set -- `vos examine $vol $LOCALAUTH | head -n1` ; SIZE=$4
 
 	S=`date +"%Y%m%d %H:%M:%S"` ; START=`date +"%s"`
 	echo "Releasing volume $vol ($S): "
