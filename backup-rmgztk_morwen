@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup-rmgztk_morwen,v 1.11 2002-10-03 11:06:28 turbo Exp $
+# $Id: backup-rmgztk_morwen,v 1.12 2002-11-10 10:43:55 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -42,15 +42,10 @@ fi
 
 # ----- I M P O R T A N T   C O N F I G F I L E S -----
 dpkg --get-selections \* | sort | gzip -f9 > $BACKUPFILE5
-tar cjpsf $BACKUPFILE1 `find etc/ldap etc/krb5* \
-    etc/pam.d var/lib/named/etc/bind etc/hosts* \
-    etc/qmail etc/tcp.smtp etc/cron* etc/apache \
-    etc/{nsswitch,danted,firewall.block,firewall}.conf \
-    etc/init.d/{qmail,slapd,slapd.backup} \
-    etc/profile etc/xinetd.d $BACKUPFILE5 \
-	-type f | egrep -v '~$' | \
-	sed -e 's@^/@@' -e 's@\.dpkg-dist@@' | \
-	sort` > /dev/null 2>&1
+tar cjpsf $BACKUPFILE1 `find %DIRS% \
+    -type f | egrep -v '~$' | \
+    sed -e 's@^/@@' -e 's@\.dpkg-dist@@' | \
+    sort` > /dev/null 2>&1
 
 # -----------------
 # Logfiles...
