@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.14 2002-10-28 14:31:50 turbo Exp $
+# $Id: backup_afs.sh,v 1.15 2002-11-04 17:06:49 turbo Exp $
 
 cd /
 
@@ -69,8 +69,8 @@ get_vol_size () {
 }
 
 # --------------
-# FUNCTION: Create and mount the backup volume
-create_backup_volume () {
+# FUNCTION: Mount the backup volume
+mount_backup_volume () {
     local vol="$1"
     local dir="$2"
 
@@ -234,7 +234,7 @@ do_backup () {
 	fi
 
 	# Mount the volume on it's mountpoint (VOLUME/OldFiles).
-	[ "$MOUNT" -gt 0 ] && create_backup_volume $volume $MNTPOINT
+	[ "$MOUNT" -gt 0 ] && mount_backup_volume $volume $MNTPOINT
 
 	if [ -z "$ERROR" ]; then
 	    # Find the partition the volume is on
