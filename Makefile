@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.10 2002-12-02 12:54:40 turbo Exp $
+# $Id: Makefile,v 1.11 2003-01-31 06:45:21 turbo Exp $
 
 install all:	clean
 	@( \
@@ -6,6 +6,7 @@ install all:	clean
 	  cp -v backup_afs.sh /afs/bayour.com/common/noarch/sbin/; \
 	  cp -v update_afs.sh /afs/bayour.com/common/noarch/sbin/; \
 	  cp -v salvage_afs.sh /afs/bayour.com/common/noarch/sbin/; \
+	  cp -v df_afs.sh /afs/bayour.com/common/noarch/sbin/; \
 	)
 	@for host in rmgztk morwen ; do \
 	  echo -n "\`backup-rmgztk_morwen' -> \`$$host:/sbin/backup-$$host'"; \
