@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: update_afs.sh,v 1.11 2002-08-31 13:12:53 turbo Exp $
+# $Id: update_afs.sh,v 1.12 2002-08-31 13:26:12 turbo Exp $
 
 cd /
 
@@ -22,7 +22,7 @@ replicated () {
     time2=`date -d "$*" "+%s"`
 
     [ ! -z "$verbose" -a ! -z "$test" ] && printf "Vol: %-25s - $time1 ; $time2 => " $rw
-    if [ $time1 -le $time2 ]; then
+    if [ $time1 -ge $time2 ]; then
 	[ ! -z "$verbose" -a ! -z "$test" ] && echo "Needs to be released."
 	return 1
     else
@@ -45,28 +45,37 @@ fi
 
 # --------------
 # Get the CLI options...
-VOLUMES="" ; TEMP=`getopt -o hupcvt --long help,users,public,common,verbose,test -- "$@"`
+VOLUMES="" ; TEMP=`getopt -o chprtuvV --long common,help,public,root,test,users,verbose,version -- "$@"`
 eval set -- "$TEMP"
 while true ; do
     case "$1" in
+	-c|--common)		search="$search common" ; shift ;;
 	-h|--help)
 	    echo "Usage:   `basename $0` [option] [volume]"
-	    echo "Options: -h,--help		Show this help"
-	    echo "	 -u,--users		Release only the user.* volumes"
-	    echo "	 -p,--public		Release only the public.* volumes"
-	    echo "	 -c,--common		Release only the common.* volumes"
-	    echo "	 -v,--verbose		Explain what's being done"
-	    echo "	 -t,--test		Get volumes, but don't relase them"
+	    echo "Options:"
+	    echo "	-c,--common	Release only the common.* volumes"
+	    echo "	-h,--help	Show this help"
+	    echo "	-p,--public	Release the public.* volumes"
+	    echo "	-r,--root	Release the root.* volumes"
+	    echo "	-t,--test	Get volumes, but don't relase them"
+	    echo "	-u,--users	Release the user.* volumes"
+	    echo "	-v,--verbose	Explain what's being done"
+	    echo "	-V,--version	Show version number"
 	    echo "If volume is given, only release that/those volumes."
 	    echo "If no option and no volume is given, backup all replicated volumes."
 	    echo 
 	    exit 0
 	    ;;
-	-c|--common)		search="$search common" ; shift ;;
-	-u|--users)		search="$search user"   ; shift ;;
-	-p|--public)		search="$search public" ; shift ;;
-	-v|--verbose)		verbose="-verbose"	; shift ;;
-	-t|--test)		test=1	  ; shift ;;
+	-p|--public)	search="$search public" ; shift ;;
+	-r|--root)	search="$search root" 	; shift ;;
+	-t|--test)	test=1 ; shift ;;
+	-u|--users)	search="$search user"   ; shift ;;
+	-v|--verbose)	verbose="-verbose"	; shift ;;
+	-V|--version)
+	    set -- `echo "$Id: update_afs.sh,v 1.12 2002-08-31 13:26:12 turbo Exp $"`
+	    echo "Version: $3"
+	    exit 0
+	    ;;
 	--)			shift ; [ -z "$VOLUMES" ] && VOLUMES="$*" ; break ;; 
 	*)			echo "Internal error!" ; exit 1 ;;
     esac
