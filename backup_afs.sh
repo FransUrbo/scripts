@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.31 2004-09-18 09:00:32 turbo Exp $
+# $Id: backup_afs.sh,v 1.32 2004-10-29 15:26:59 turbo Exp $
 
 cd /
 
@@ -384,6 +384,10 @@ if [ "$ODD" != "1" ]; then
     BACKUPDIR="/var/.backups-volumes/odd"
 else
     BACKUPDIR="/var/.backups-volumes/even"
+fi
+
+if [ ! -d "$BACKUPDIR" ]; then
+    mkdir -p $BACKUPDIR
 fi
 
 # --------------
