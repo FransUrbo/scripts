@@ -1,10 +1,11 @@
 #!/bin/sh
 
-# $Id: backup,v 1.14 2003-01-08 09:53:13 turbo Exp $
+# $Id: backup,v 1.15 2003-02-07 11:08:34 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
 BACKUPFILE1=$BACKUPDIR/System/confs-$DATE.tar.bz2
+BACKUPFILE2=$BACKUPDIR/MySQL/mysql-$DATE.sql.bz2
 BACKUPFILE4=$BACKUPDIR/OpenAFS/afsd-$DATE.gz
 BACKUPFILE5=/etc/dpkg/selections-$DATE.gz
 BACKUPFILE6=$BACKUPDIR/Important/important-$DATE.tar.bz2
@@ -30,6 +31,17 @@ fi
 TMPFILE=`tempfile -p psql.` ; chown postgres $TMPFILE
 su postgres -c "/usr/lib/postgresql/bin/pg_dumpall -c > $TMPFILE"
 cat $TMPFILE | bzip2 > $BACKUPFILE9
+rm -f $TMPFILE
+
+# ----- M y S Q L -----
+TMPFILE=`tempfile -p mysql.` ; chown mysql $TMPFILE
+USER=`cat /root/.my.cnf | grep ^user | sed 's@.*= @@'`
+PASS=`cat /root/.my.cnf | grep ^pass | sed 's@.*= @@'`
+/usr/bin/mysqldump -u $USER --password=$PASS \
+    -Aaclt --add-drop-table --add-locks > $TMPFILE
+if [ "$0" == "0" ]; then
+    cat $TMPFILE | bzip2 > $BACKUPFILE2
+fi
 rm -f $TMPFILE
 
 # ----- I M P O R T A N T   C O N F I G F I L E S -----
