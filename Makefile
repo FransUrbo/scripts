@@ -1,6 +1,6 @@
-# $Id: Makefile,v 1.18 2003-10-29 07:58:30 turbo Exp $
+# $Id: Makefile,v 1.19 2003-12-18 14:09:34 turbo Exp $
 
-sBINARIES="backup_afs.sh update_afs.sh salvage_afs.sh qmail-runq qmail-stats.pl"
+sBINARIES="backup_afs.sh update_afs.sh salvage_afs.sh qmail-runq qmail-stats.pl convert_openldap_db.pl"
 uBINARIES="df_afs.pl list_afs_vols.sh idn.sh"
 
 install all:	clean
