@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.10 2002-10-13 08:32:17 turbo Exp $
+# $Id: backup_afs.sh,v 1.11 2002-10-14 06:28:25 turbo Exp $
 
 cd /
 
@@ -148,17 +148,25 @@ do_backup () {
 	if ! echo $RES | grep -q 'Created backup volume for'; then
 	    echo -n "Could not create backup volume for '$volume' - "
 
-	    if echo $RES | grep -q 'VOLSER: volume is busy'; then
-		echo "volume is busy."
-
-		# Try to backup this volume later...
-		MISSING_VOLUMES="$MISSING_VOLUMES $volume"
-	    elif echo $RES | grep -q 'VLDB: no such entry'; then
+	    if echo $RES | grep -q 'VLDB: no such entry'; then
 		echo "no such volume."
 	    elif echo $RES | grep -q 'VLDB: no permission access for call'; then
 		echo "permission denied."
 	    else
-		echo "'$RES'"
+		# Failed to create backup volume
+		echo ; echo "Error message:" ; echo "$RES"
+
+		if echo $RES | grep -q 'VLDB: vldb entry is already locked'; then
+		    # FAILED - vldb locked
+		    echo "Trying to unlock the volume so we can try again"
+		    vos unlock $volume -localauth > /dev/null 2>&1
+		elif echo $RES | grep -q 'VOLSER: volume is busy'; then
+		    echo "volume is busy."
+		elif echo $RES | grep -q 'Volume needs to be salvaged'; then
+		    # FAILED - salvage volume
+		    echo "Trying to salvage the volume so we can try again"
+		    bos salvage -server ${AFSSERVER:-localhost} -partition $PART -volume $volume -localauth
+		fi
 
 		# Try to backup this volume later...
 		MISSING_VOLUMES="$MISSING_VOLUMES $volume"
@@ -199,20 +207,10 @@ do_backup () {
 	    fi
 
 	    if echo $RES | grep -q 'Dumped volume'; then
-		# DUMP OK
+		# DUMP FAILED - any reason
 
 		RES=`echo $RES | sed 's@.* /@/@'`
 		[ ! -z "$verbose" ] && echo "$RES"
-	    elif echo $RES | grep -q 'VLDB: vldb entry is already locked'; then
-		# DUMP FAILED - vldb locked
-
-		vos unlock $volume -localauth > /dev/null 2>&1
-		dump_volume $volume $BACKUPFILE
-	    elif echo $RES | grep -q 'Volume needs to be salvaged'; then
-		# DUMP FAILED - salvage volume
-
-		bos salvage -server ${AFSSERVER:-localhost} -partition $PART -volume $volume -localauth
-		dump_volume $volume $BACKUPFILE
 	    fi
 
 	    # ------------------
