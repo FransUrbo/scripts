@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.9 2002-09-20 05:06:16 turbo Exp $
+# $Id: backup,v 1.10 2002-10-03 10:33:07 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -32,7 +32,7 @@ cat $TMPFILE | bzip2 > $BACKUPFILE9
 rm -f $TMPFILE
 
 # ----- I M P O R T A N T   C O N F I G F I L E S -----
-dpkg --get-selections | gzip -f9 > $BACKUPFILE5
+dpkg --get-selections \* | gzip -f9 > $BACKUPFILE5
 tar cjpsf $BACKUPFILE1 `find etc/ldap etc/krb5* etc/lvm* \
     etc/roxen2 etc/pam.d etc/bind etc/{libnss-,pam_}ldap.conf \
     etc/auto.master etc/hosts* etc/qmail etc/tcp.{smtp,qmqp} \
