@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: kprop.sh,v 1.3 2005-01-28 10:29:02 turbo Exp $
+# $Id: kprop.sh,v 1.4 2005-01-31 08:50:28 turbo Exp $
 
 kdclist="kerberos2.bayour.com"
 
@@ -12,20 +12,23 @@ fix_error() {
 	    # Error: FS readonly
 
 	    mount -o remount,rw $fs
+	    touch /tmp/$$ > /dev/null 2>&1 
 	    if [ "$?" == "0" ]; then
 		error=0
 	    else
+		# Didn't work. Try again.
+		umount /tmp && mount /tmp
 		error=`expr $error + 1`
 	    fi
-	elif echo $msg | grep -qi 'No space left on device'; then
-	    # Error: FS full
-	    #fs=`mount | egrep 'ext[23] \(rw\)' | grep -v /vice | sed -e 's@.*on @@' -e 's@\ .*@@'`
-
-	    # Not sure how I should handle this...
+#	elif echo $msg | grep -qi 'No space left on device'; then
+#	    # Error: FS full
+#	    #fs=`mount | egrep 'ext[23] \(rw\)' | grep -v /vice | sed -e 's@.*on @@' -e 's@\ .*@@'`
+#
+#	    # Not sure how I should handle this...
 	fi
     done
 
-    if [ "$error" == "1" ]; then
+    if [ "$error" -gt "0" ]; then
 	exit 1
     fi
 }
