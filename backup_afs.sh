@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.25 2003-10-21 05:55:34 turbo Exp $
+# $Id: backup_afs.sh,v 1.26 2003-10-22 05:35:57 turbo Exp $
 
 cd /
 
@@ -411,6 +411,7 @@ done
 
 # --------------
 # 'Initialize' AFS access...
+ID=`id -u`
 if [ "$ID" = "0" ]; then
     LOCALAUTH="-localauth"
 else
