@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.15 2003-02-07 11:08:34 turbo Exp $
+# $Id: backup,v 1.16 2003-02-14 17:17:14 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -28,19 +28,27 @@ if [ -d "$DIR" ]; then
 fi
 
 # ----- P O S T G R E S Q L -----
-TMPFILE=`tempfile -p psql.` ; chown postgres $TMPFILE
-su postgres -c "/usr/lib/postgresql/bin/pg_dumpall -c > $TMPFILE"
-cat $TMPFILE | bzip2 > $BACKUPFILE9
+TMPFILE=`tempfile -p psql.` ; chown postgres $TMPFILE ; chmod 600 $TMPFILE
+su postgres -c "/usr/lib/postgresql/bin/pg_dumpall -c > $TMPFILE 2> /dev/null"
+if [ "$?" == "0" ]; then
+    echo "Successfully backed up PostgreSQL database(s)."
+    cat $TMPFILE | bzip2 > $BACKUPFILE9
+else
+    echo "Failed to backup PostgreSQL database(s)!"
+fi
 rm -f $TMPFILE
 
 # ----- M y S Q L -----
-TMPFILE=`tempfile -p mysql.` ; chown mysql $TMPFILE
+TMPFILE=`tempfile -p mysql.` ; chown mysql $TMPFILE ; chmod 600 $TMPFILE
 USER=`cat /root/.my.cnf | grep ^user | sed 's@.*= @@'`
 PASS=`cat /root/.my.cnf | grep ^pass | sed 's@.*= @@'`
 /usr/bin/mysqldump -u $USER --password=$PASS \
     -Aaclt --add-drop-table --add-locks > $TMPFILE
-if [ "$0" == "0" ]; then
+if [ "$?" == "0" ]; then
+    echo "Successfully backed up MySQL database(s)."
     cat $TMPFILE | bzip2 > $BACKUPFILE2
+else
+    echo "Failed to backup MySQL database(s)!"
 fi
 rm -f $TMPFILE
 
