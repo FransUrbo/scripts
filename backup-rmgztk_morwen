@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup-rmgztk_morwen,v 1.5 2002-09-15 14:27:05 turbo Exp $
+# $Id: backup-rmgztk_morwen,v 1.6 2002-09-15 14:41:05 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups && mkdir $BACKUPDIR/$DATE
@@ -21,7 +21,7 @@ cd /
 # ----- L D A P -----
 if [ -f /etc/init.d/slapd.backup ]; then
     /etc/init.d/slapd.backup stop > /dev/null 2>&1
-    slapcat -n /var/lib/ldap.backup/COM/id2entry.dbb | \
+    slapcat -n /var/lib/ldap.backup/id2entry.dbb | \
 	egrep -v '^replace:' | \
 	bzip2 > $BACKUPFILE2
     /etc/init.d/slapd.backup start > /dev/null 2>&1
