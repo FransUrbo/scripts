@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: update_afs.sh,v 1.10 2002-08-31 11:29:08 turbo Exp $
+# $Id: update_afs.sh,v 1.11 2002-08-31 13:12:53 turbo Exp $
 
 cd /
 
@@ -22,7 +22,7 @@ replicated () {
     time2=`date -d "$*" "+%s"`
 
     [ ! -z "$verbose" -a ! -z "$test" ] && printf "Vol: %-25s - $time1 ; $time2 => " $rw
-    if [ $time1 -ge $time2 ]; then
+    if [ $time1 -le $time2 ]; then
 	[ ! -z "$verbose" -a ! -z "$test" ] && echo "Needs to be released."
 	return 1
     else
