@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: update_afs.sh,v 1.5 2002-08-29 13:57:03 turbo Exp $
+# $Id: update_afs.sh,v 1.6 2002-08-29 14:40:29 turbo Exp $
 
 cd /
 
@@ -43,7 +43,7 @@ while true ; do
 	-c|--common)		search="$search common" ; shift ;;
 	-u|--users)		search="$search user"   ; shift ;;
 	-p|--public)		search="$search public" ; shift ;;
-	-v|--verbose)		verbose=1 ; shift ;;
+	-v|--verbose)		verbose="-verbose"	; shift ;;
 	-t|--test)		test=1	  ; shift ;;
 	--)			shift ; [ -z "$VOLUMES" ] && VOLUMES="$*" ; break ;; 
 	*)			echo "Internal error!" ; exit 1 ;;
@@ -71,8 +71,13 @@ if [ ! -z "$test" ]; then
 fi
 
 for vol in $VOLUMES; do
-    [ ! -z "$verbose" ] && echo -n "Releasing volume: $vol"
-    RES=`vos release $vol $LOCALAUTH 2>&1`
+    if [ ! -z "$verbose" ]; fi
+	echo -n "Releasing volume: $vol"
+	vos release $vol $LOCALAUTH $verbose
+    else
+	RES=`vos release $vol $LOCALAUTH 2>&1`
+    fi
+
     res=$?
     if [ "$res" != "0" ]; then
 	# An error occured!
