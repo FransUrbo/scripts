@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.11 2002-10-03 10:54:33 turbo Exp $
+# $Id: backup,v 1.12 2002-10-13 08:24:34 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -27,14 +27,14 @@ fi
 
 # ----- P O S T G R E S Q L -----
 TMPFILE=`tempfile -p psql.` ; chown postgres $TMPFILE
-su postgres -c "/usr/lib/postgresql/bin/pg_dumpall -c > $TMPFILE"
+su postgres -c "/usr/lib/postgresql/bin/pg_dumpall -c > $TMPFILE 2> /dev/null"
 cat $TMPFILE | bzip2 > $BACKUPFILE9
 rm -f $TMPFILE
 
 # ----- I M P O R T A N T   C O N F I G F I L E S -----
 dpkg --get-selections \* | sort | gzip -f9 > $BACKUPFILE5
 tar cjpsf $BACKUPFILE1 `find etc/ldap etc/krb5* etc/lvm* \
-    etc/roxen2 etc/pam.d etc/bind etc/{libnss-,pam_}ldap.conf \
+    etc/roxen2 etc/pam.d /etc/{libnss-,pam_}ldap.conf \
     etc/auto.master etc/hosts* etc/qmail etc/tcp.{smtp,qmqp} \
     etc/{nsswitch,squid,watchdog,danted,firewall.block,firewall}.conf \
     usr/lib/squid/ldap_auth.alan_sparks etc/apache etc/cron* \
