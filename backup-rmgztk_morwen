@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup-rmgztk_morwen,v 1.1 2002-09-14 07:17:11 turbo Exp $
+# $Id: backup-rmgztk_morwen,v 1.2 2002-09-14 07:31:02 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups && mkdir $BACKUPDIR/$DATE
@@ -34,12 +34,13 @@ fi
 
 # ----- I M P O R T A N T   C O N F I G F I L E S -----
 dpkg --get-selections | gzip -f9 > $BACKUPFILE5
-tar cjpsf $BACKUPFILE1 `find etc/ldap etc/krb5* etc/lvm* \
-    etc/pam.d var/bind var/lib/named/etc/bind etc/hosts* \
-    etc/qmail etc/tcp.smtp etc/{nsswitch,danted,firewall.block,firewall}.conf \
-    etc/cron* etc/init.d/{qmail,slapd,slapd.backup} \
-    etc/apache etc/profile etc/xinetd.d $BACKUPFILE5 \
-    -type f | egrep -v '~$' | sed -e 's@^/@@' \
+tar cjpsf $BACKUPFILE1 `find etc/ldap etc/krb5* \
+    etc/pam.d var/lib/named/etc/bind etc/hosts* \
+    etc/qmail etc/tcp.smtp etc/cron* etc/apache \
+    etc/{nsswitch,danted,firewall.block,firewall}.conf \
+    etc/init.d/{qmail,slapd,slapd.backup} \
+    etc/profile etc/xinetd.d $BACKUPFILE5 \
+	-type f | egrep -v '~$' | sed -e 's@^/@@' \
 	-e 's@\.dpkg-dist@@' | sort`
 
 # -----------------
@@ -54,4 +55,5 @@ done
 rm -f $BACKUPFILE5
 
 cd $BACKUPDIR
-tar --remove-files cf ../backups-$DATE.tar *
+tar --remove-files -cf ../backups-$DATE.tar .
+
