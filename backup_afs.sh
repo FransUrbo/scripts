@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.6 2002-10-07 06:42:12 turbo Exp $
+# $Id: backup_afs.sh,v 1.7 2002-10-07 07:24:53 turbo Exp $
 
 cd /
 
@@ -196,7 +196,7 @@ do_backup () {
 	    elif echo $RES | grep -q 'VLDB: vldb entry is already locked'; then
 		if [ "$unlock" != "$volume" ]; then
 		    # We haven't unlocked this volume before
-		    vos unlockvldb $volume > /dev/null 2>&1
+		    vos unlock $volume -localauth > /dev/null 2>&1
 		    unlock=$volume
 		    goto DUMP
 		fi
