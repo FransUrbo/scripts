@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup-rmgztk_morwen,v 1.4 2002-09-15 14:12:31 turbo Exp $
+# $Id: backup-rmgztk_morwen,v 1.5 2002-09-15 14:27:05 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups && mkdir $BACKUPDIR/$DATE
@@ -44,8 +44,9 @@ tar cjpsf $BACKUPFILE1 `find etc/ldap etc/krb5* \
     etc/{nsswitch,danted,firewall.block,firewall}.conf \
     etc/init.d/{qmail,slapd,slapd.backup} \
     etc/profile etc/xinetd.d $BACKUPFILE5 \
-	-type f | egrep -v '~$' | sed -e 's@^/@@' \
-	-e 's@\.dpkg-dist@@' | sort`
+	-type f | egrep -v '~$' | \
+	sed -e 's@^/@@' -e 's@\.dpkg-dist@@' | \
+	sort` 2> /dev/null
 
 # -----------------
 # Logfiles...
