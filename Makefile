@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.30 2004-09-16 05:42:35 turbo Exp $
+# $Id: Makefile,v 1.31 2004-09-18 09:00:32 turbo Exp $
 
 sBIN		= /afs/bayour.com/common/noarch/sbin
 uBIN		= /afs/bayour.com/common/noarch/bin
@@ -6,12 +6,21 @@ sBINARIES	= backup_afs.sh update_afs.sh salvage_afs.sh qmail-runq qmail-stats.pl
 uBINARIES	= df_afs.pl list_afs_vols.sh idn.sh build-latest-spamassassin.sh cvs-rsh
 
 install all:	clean
-	@(cp -v backup /sbin/backup-`hostname`; \
-	  for file in $(sBINARIES) ; do \
+	@(for file in $(sBINARIES) ; do \
 	    cp -v $$file $(sBIN)/; \
+	    for host in aurora morwen ; do \
+	      echo -n "\`$$file' -> \`$$host:/usr/local/sbin/'"; \
+	      rcp -x $$file root@$$host:/usr/local/sbin/; \
+	      echo; \
+	    done; \
 	  done; \
 	  for file in $(uBINARIES) ; do \
 	    cp -v $$file $(uBIN)/; \
+	    for host in aurora morwen ; do \
+	      echo -n "\`$$file' -> \`$$host:/usr/local/bin/'"; \
+	      rcp -x $$file root@$$host:/usr/local/bin/; \
+	      echo; \
+	    done; \
 	  done; \
 	  for host in aurora morwen ; do \
 	    echo -n "\`backup-rmgztk_morwen' -> \`$$host:/sbin/backup-$$host'"; \
@@ -31,6 +40,7 @@ install all:	clean
 	  done; \
 	  echo -n "\`kprop.sh' -> \`aurora:/usr/sbin/'"; \
 	  rcp -x kprop.sh root@aurora:/usr/sbin; \
+	  rcp -x backup root@aurora:/sbin/backup-`hostname`; \
 	  cp cron.weekly /etc/cron.weekly/backup; \
 	  echo)
 

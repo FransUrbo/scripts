@@ -1,12 +1,12 @@
 #!/bin/sh
 
-# $Id: df_afs.sh,v 1.1 2003-01-31 06:45:21 turbo Exp $
+# $Id: df_afs.sh,v 1.2 2004-09-18 09:00:32 turbo Exp $
 
 cd /
 
 # --------------
 # Set some default variables
-AFSSERVER="papadoc.bayour.com"
+AFSSERVER="aurora.bayour.com"
 AFSCELL="bayour.com"
 
 PARTS="`vos listpart ${AFSSERVER:-localhost} | sed 1d | head -n1`"

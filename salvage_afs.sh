@@ -1,12 +1,12 @@
 #!/bin/sh
 
-# $Id: salvage_afs.sh,v 1.2 2002-12-08 10:01:41 turbo Exp $
+# $Id: salvage_afs.sh,v 1.3 2004-09-18 09:00:32 turbo Exp $
 
 cd /
 
 # --------------
 # Set some default variables
-AFSSERVER="papadoc.bayour.com"
+AFSSERVER="aurora.bayour.com"
 AFSCELL="bayour.com"
 
 # --------------

@@ -1,12 +1,12 @@
 #!/bin/sh
 
-# $Id: update_afs.sh,v 1.16 2003-10-25 14:51:06 turbo Exp $
+# $Id: update_afs.sh,v 1.17 2004-09-18 09:00:32 turbo Exp $
 
 cd /
 
 # --------------
 # Set some default variables
-AFSSERVER="papadoc.bayour.com"
+AFSSERVER="aurora.bayour.com"
 AFSCELL="bayour.com"
 
 # --------------
@@ -72,7 +72,7 @@ while true ; do
 	-u|--users)	search="$search user"   ; shift ;;
 	-v|--verbose)	verbose="-verbose"	; shift ;;
 	-V|--version)
-	    set -- `echo "$Id: update_afs.sh,v 1.16 2003-10-25 14:51:06 turbo Exp $"`
+	    set -- `echo "$Id: update_afs.sh,v 1.17 2004-09-18 09:00:32 turbo Exp $"`
 	    echo "Version: $3"
 	    exit 0
 	    ;;

@@ -7,7 +7,7 @@ MASTER_LDAP_SERVER="-H ldaps://ldap1.bayour.com"
 
 # If unset, don't use AFS...
 AFS_CELL="bayour.com"
-AFS_SERVER="papadoc.bayour.com"
+AFS_SERVER="aurora.bayour.com"
 AFS_QUOTA="5000"
 
 KRB5_RSH_CMD="krb5-rsh -x -l root $MASTER_KERBEROS_SERVER /usr/sbin/kadmin.local"
@@ -187,7 +187,7 @@ if echo $RESULT | grep -iq "^y"; then
 	fi
 
 	# Remove volume
-	if vos listvol papadoc | grep -q '^user.$USERID '; then
+	if vos listvol $AFS_SERVER | grep -q '^user.$USERID '; then
 	    vos remove -id user.$USERID > /dev/null
 	    echo -n "F"
 	fi

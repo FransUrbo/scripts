@@ -1,12 +1,12 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.30 2004-02-16 18:12:37 turbo Exp $
+# $Id: backup_afs.sh,v 1.31 2004-09-18 09:00:32 turbo Exp $
 
 cd /
 
 # --------------
 # Set some default variables
-AFSSERVER="papadoc.bayour.com"
+AFSSERVER="aurora.bayour.com"
 AFSCELL="bayour.com"
 CURRENTDATE=`date +"%Y%m%d"`
 MAXSIZE=2000000

@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 
-# $Id: test-psql.pl,v 1.1 2003-10-21 05:56:40 turbo Exp $
+# $Id: test-psql.pl,v 1.2 2004-09-18 09:00:32 turbo Exp $
 
-# Test for PostgreSQL daemon on papadoc
+# Test for PostgreSQL daemon on aurora
 #
 # => If 'no',  restart PostgreSQL
 
@@ -27,6 +27,6 @@ sub check_psql {
 if(! &check_psql()) {
     # No postmaster running
     
-    print "PostgreSQL on papadoc is down - restarting.\n";
+    print "PostgreSQL on aurora is down - restarting.\n";
     system($psql_stop); system($psql_start);
 }

@@ -1,8 +1,8 @@
 #!/usr/bin/perl -w
 
-# $Id: df_afs.pl,v 1.2 2003-10-11 09:18:48 turbo Exp $
+# $Id: df_afs.pl,v 1.3 2004-09-18 09:00:32 turbo Exp $
 
-$AFSSERVER="papadoc.bayour.com";
+$AFSSERVER="aurora.bayour.com";
 
 print "                                                        {    A F S    }\n";
 print "Filesystem            Size  Used Avail Use% Mounted on  Size Used Avail\n";

@@ -2,7 +2,7 @@
 
 # --------------
 # Set some default variables
-AFSSERVER="papadoc.bayour.com"
+AFSSERVER="aurora.bayour.com"
 AFSCELL="bayour.com"
 
 # --------------
