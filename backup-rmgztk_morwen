@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup-rmgztk_morwen,v 1.14 2002-11-23 09:35:20 turbo Exp $
+# $Id: backup-rmgztk_morwen,v 1.15 2004-03-22 08:08:45 turbo Exp $
 #
 # Backup script for host: %HOST%
 
@@ -29,10 +29,13 @@ done
 # ----- L D A P -----
 if [ -f /etc/init.d/slapd.backup ]; then
     /etc/init.d/slapd.backup stop > /dev/null 2>&1
-    slapcat -n /var/lib/ldap.backup/id2entry.dbb | \
-	egrep -v '^replace:' | \
-	bzip2 > $BACKUPFILE2
+    slapcat -n /var/lib/ldap.backup/id2entry.dbb \
+	-f /etc/ldap/slapd.conf.backup \
+	-l /tmp/ldap.ldif -b 'dc=com' | \
+	egrep -v '^replace:'
     /etc/init.d/slapd.backup start > /dev/null 2>&1
+    cat /tmp/ldap.ldif | bzip2 > $BACKUPFILE2
+    rm /tmp/ldap.ldif
 fi
 
 # ----- K E R B E R O S -----
