@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: salvage_afs.sh,v 1.1 2002-12-02 12:53:37 turbo Exp $
+# $Id: salvage_afs.sh,v 1.2 2002-12-08 10:01:41 turbo Exp $
 
 cd /
 
@@ -14,6 +14,10 @@ AFSCELL="bayour.com"
 get_vol_part () {
     local vol=$1
     PART=`vos examine $vol $LOCALAUTH | sed 1d | head -n1 | sed 's@.*/@/@'`
+    if [ -z "$PART" ]; then
+	# Could not find the partition, try again
+	PART=`vos examine $vol $LOCALAUTH | egrep 'server .* partition .* RW Site' | sed -e 's@.*/@/@' -e 's@ .*@@'`
+    fi
     [ ! -z "$action" -o ! -z "$verbose" ] && printf "%-65s\n" "Partition for volume $vol is $PART"
 }
 
