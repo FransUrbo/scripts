@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: modify_ldap_database.pl,v 1.1 2004-07-25 09:23:05 turbo Exp $
+# $Id: modify_ldap_database.pl,v 1.2 2004-09-16 05:21:05 turbo Exp $
 
 # This script will convert a OpenLDAP v2.0 database
 # to a OpenLDAP 2.[12] one.
@@ -257,7 +257,7 @@ for($i=0; $i < $count; $i++) {
 	    # proxy user needs SEARCH access to the 'userPassword', 'krb5PrincipalName', 'mail' and
 	    # 'mailAlternateAddress' attributes.
 	    foreach $proxy (@PROXY) {
-		print "OpenLDAPaci: ".$ACI++."#entry#grant;s;userPassword,krb5PrincipalName,cn,mail,mailAlternateAddress$phpQLAdminAttribs#access-id#$proxy\n";
+		print "OpenLDAPaci: ".$ACI++."#entry#grant;s;userPassword,krb5PrincipalName,mail,mailAlternateAddress$phpQLAdminAttribs#access-id#$proxy\n";
 	    }
 
 	    # ------------------
