@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.6 2002-11-10 10:55:26 turbo Exp $
+# $Id: Makefile,v 1.7 2002-11-20 19:54:47 turbo Exp $
 
 install all:	clean
 	@( \
@@ -14,6 +14,7 @@ install all:	clean
 	  rm .TMPFILE; \
 	  echo "done."; \
 	done
+	rcp -x kprop.sh root@rmgztk:/usr/sbin
 
 clean:
 	@rm -f *~ .#*
