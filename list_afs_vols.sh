@@ -36,6 +36,8 @@ if [ ! -z "$1" ]; then
 	esac
     done
 fi
+
+TMPFILE=`tempfile -p lst.`
     
 # --------------
 set -- `vos listpart ${AFSSERVER:-localhost} | grep -v '^[A-Z]'`
@@ -44,11 +46,13 @@ for part in $PARTITIONS; do
     set -- `mount | grep $part`
     dev="$1"
 
+    echo 0 > $TMPFILE
+
     vos listvol ${AFSSERVER:-localhost} $part | grep '^[a-z]' | \
     while read line; do
-	set -- `echo $line`
+	echo 1 > $TMPFILE
 
-	# /vicepc  : user.jerry                     :  536871002 : RW :       10K : On-line
+	set -- `echo $line`
 	if [ -z "$NOFORMAT" ]; then
 	    printf "%-10s %-8s %-30s %10s %-2s %8d%s %s\n" $dev $part $1 $2 $3 $4 $5 $6
 	else
@@ -56,6 +60,7 @@ for part in $PARTITIONS; do
 	fi
     done
 
-    [ -z "$NOFORMAT" ] && echo
+    gotvols=`cat $TMPFILE`
+    [ -z "$NOFORMAT" -a "$gotvols" != 0 ] && echo
 done
-
+rm $TMPFILE
