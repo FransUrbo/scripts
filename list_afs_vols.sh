@@ -40,7 +40,7 @@ fi
 TMPFILE=`tempfile -p lst.`
     
 # --------------
-set -- `vos listpart ${AFSSERVER:-localhost} | grep -v '^[A-Z]'`
+set -- `vos listpart ${AFSSERVER:-localhost} $LOCALAUTH | grep -v '^[A-Z]'`
 PARTITIONS="$*"
 for part in $PARTITIONS; do
     set -- `mount | grep $part`
@@ -48,7 +48,7 @@ for part in $PARTITIONS; do
 
     echo 0 > $TMPFILE
 
-    vos listvol ${AFSSERVER:-localhost} $part | grep '^[a-z]' | \
+    vos listvol ${AFSSERVER:-localhost} $part $LOCALAUTH | grep '^[a-z]' | \
     while read line; do
 	echo 1 > $TMPFILE
 
