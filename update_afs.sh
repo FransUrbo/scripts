@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: update_afs.sh,v 1.12 2002-08-31 13:26:12 turbo Exp $
+# $Id: update_afs.sh,v 1.13 2003-10-21 14:55:22 turbo Exp $
 
 cd /
 
@@ -72,7 +72,7 @@ while true ; do
 	-u|--users)	search="$search user"   ; shift ;;
 	-v|--verbose)	verbose="-verbose"	; shift ;;
 	-V|--version)
-	    set -- `echo "$Id: update_afs.sh,v 1.12 2002-08-31 13:26:12 turbo Exp $"`
+	    set -- `echo "$Id: update_afs.sh,v 1.13 2003-10-21 14:55:22 turbo Exp $"`
 	    echo "Version: $3"
 	    exit 0
 	    ;;
@@ -116,10 +116,14 @@ fi
 
 for vol in $VOLUMES; do
     if [ ! -z "$verbose" ]; then
-    	echo "-----------"
-	echo -n "Releasing volume: "
+	D=`date +"%Y%m%d %H:%M:%S"` ; START=`date +"%s"`
+	echo "Releasing volume $volume ($D): "
 	vos release $vol $LOCALAUTH $verbose -encrypt
-	echo
+
+	E=`date +"%Y%m%d %H:%M:%S"`
+	SEC=`expr $END - $START` ; MIN=`expr $SEC / 60`
+
+	echo "Volume released at $E. Took $SEC sec (~$MIN min)"
     else
 	RES=`vos release $vol $LOCALAUTH -encrypt 2>&1`
     fi
