@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.7 2002-10-07 07:24:53 turbo Exp $
+# $Id: backup_afs.sh,v 1.8 2002-10-08 06:01:40 turbo Exp $
 
 cd /
 
@@ -92,10 +92,30 @@ create_backup_volume () {
 }
 
 # --------------
+dump_volume () {
+    local $vol="$1".backup
+    local $file="$2"
+
+    if [ $SIZE -ge $MAXSIZE ]; then
+	# If the volume is bigger than 2Gb, dump in section using 'split'.
+
+	if [ ! -z "$action" ]; then
+	    RES=`$action vos dump -id $vol -server ${AFSSERVER:-localhost} \
+		-partition $PART $TIMEARG -localauth 2> /dev/null \| split -b1024m - $file. 2>&1`
+	else
+	    RES=`vos dump -id $vol -server ${AFSSERVER:-localhost} \
+		-partition $PART $TIMEARG -localauth 2> /dev/null | split -b1024m - $file. 2>&1`
+	fi
+    else
+	RES=`$action vos dump -id $vol -server ${AFSSERVER:-localhost} \
+	    -partition $PART $TIMEARG -file $file -localauth 2>&1`
+    fi
+}
+
+# --------------
 do_backup () {
     local VOLUMES="$*"
     local volume
-    local RES
     local BACKUPFILE
     local TIMEARG
     local ERROR
@@ -173,37 +193,17 @@ do_backup () {
 		fi
 	    fi
 	
-    DUMP:
-	    # Do the backup
-	    if [ $SIZE -ge $MAXSIZE ]; then
-		# If the volume is bigger than 2Gb, dump in section using 'split'.
-
-		if [ ! -z "$action" ]; then
-		    RES=`$action vos dump -id "$volume".backup -server ${AFSSERVER:-localhost} \
-			-partition $PART $TIMEARG -localauth 2> /dev/null \| split -b1024m - $BACKUPFILE. 2>&1`
-		else
-		    RES=`vos dump -id "$volume".backup -server ${AFSSERVER:-localhost} \
-			-partition $PART $TIMEARG -localauth 2> /dev/null | split -b1024m - $BACKUPFILE. 2>&1`
-		fi
-	    else
-		RES=`$action vos dump -id "$volume".backup -server ${AFSSERVER:-localhost} \
-		    -partition $PART $TIMEARG -file $BACKUPFILE -localauth 2>&1`
+	    dump_volume $volume $BACKUPFILE
+	    if [ -z "$?" ]; then
+		ERROR=2
 	    fi
 
 	    if echo $RES | grep -q 'Dumped volume'; then
 		RES=`echo $RES | sed 's@.* /@/@'`
 		[ ! -z "$verbose" ] && echo "$RES"
 	    elif echo $RES | grep -q 'VLDB: vldb entry is already locked'; then
-		if [ "$unlock" != "$volume" ]; then
-		    # We haven't unlocked this volume before
-		    vos unlock $volume -localauth > /dev/null 2>&1
-		    unlock=$volume
-		    goto DUMP
-		fi
-	    fi
-
-	    if [ -z "$?" ]; then
-		ERROR=2
+		vos unlock $volume -localauth > /dev/null 2>&1
+		dump_volume $volume $BACKUPFILE
 	    fi
 
 	    # ------------------
