@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.27 2003-11-03 12:10:41 turbo Exp $
+# $Id: backup_afs.sh,v 1.28 2004-01-01 17:55:45 turbo Exp $
 
 cd /
 
@@ -37,6 +37,11 @@ last_modified () {
 # FUNCTION: Check if volume have been modified within the last 24 hours
 #	    Returns 1 if it have, 0 if not
 get_vol_mod () {
+    if [ "$TYPE" = "all" ]; then
+	# Backup this volume wether it's been modified resently or not: --all specified!
+	return 1
+    fi
+
     # Examine volume - when was volume last modified?
     local last=`vos examine $1 $LOCALAUTH | grep 'Last Update' | sed 's@.*Update @@'`
 
@@ -108,7 +113,7 @@ mount_backup_volume () {
 
     [ -z "$dir" ] && dir="/afs/$AFSCELL"
 
-    if [ "$dir" == "/afs/$AFSCELL" ]; then
+    if [ "$dir" = "/afs/$AFSCELL" ]; then
 	OLDFILES="/afs/$AFSCELL/OldFiles_`echo $vol`-`echo $CURRENTDATE`"
     else
 	OLDFILES="$dir/OldFiles_$CURRENTDATE"
@@ -276,7 +281,7 @@ do_backup () {
 		    
 		    # Try to backup this volume later...
 		    MISSING_VOLUMES="$MISSING_VOLUMES $volume"
-		elif [ "$RES" == 1 ]; then
+		elif [ "$RES" = 1 ]; then
 		    # Ignore nonexisting volumes
 		    echo -n
 		else
@@ -300,9 +305,9 @@ do_backup () {
 		    
 		    # Is this a incremental or a full backup? If it's incremental, dump from
 		    # last known date
-		    BACKUPFILE="$BACKUPDIR/$TYPE-$volume-$CURRENTDATE"
 		    if [ "$TYPE" = "incr" ]; then
-			last_modified "$BACKUPDIR/$TYPE-$volume-"
+			BACKUPFILE="$BACKUPDIR/incr-$volume-$CURRENTDATE"
+			last_modified "$BACKUPDIR/incr-$volume-"
 			
 			if [ ! -z "$DATE" ]; then
 			    if [ ! -z "$verbose" ]; then
@@ -312,6 +317,10 @@ do_backup () {
 			else
 			    BACKUPFILE="$BACKUPDIR/full-$volume-$CURRENTDATE"
 			fi
+		    elif [ "$TYPE" = "full" ]; then
+			BACKUPFILE="$BACKUPDIR/full-$volume-$CURRENTDATE"
+		    elif [ "$TYPE" = "all" ]; then
+			BACKUPFILE="$BACKUPDIR/full-$volume-$CURRENTDATE"
 		    fi
 		    
 		    dump_volume $volume $BACKUPFILE
@@ -381,7 +390,7 @@ fi
 
 # --------------
 # Get the CLI options...
-TEMP=`getopt -o heuimcv --long help,echo,users,incr,mount,nocreate-vol,verbose -- "$@"`
+TEMP=`getopt -o heuimcva --long help,echo,users,incr,mount,nocreate-vol,verbose,all -- "$@"`
 eval set -- "$TEMP"
 while true ; do
     case "$1" in
@@ -390,7 +399,8 @@ while true ; do
 	    echo "Options: -h,--help		Show this help"
 	    echo "	 -e,--echo		Don't do anything, just echo the commands"
 	    echo "	 -u,--users		Backup only the user.* volumes"
-	    echo "	 -i,--incr		Do a incremental backup"
+	    echo "	 -i,--incr		Do a incremental backup (only changed volumes)"
+	    echo "	 -a,--all		Do a FULL backup (even volumes not changed)"
 	    echo "	 -m,--mount		Mount the volumes before doing the backup"
 	    echo "	 -c,--nocreate-vol	Don't create the backup volume(s) before backup"
 	    echo "	 -v,--verbose		Explain what's to be done"
@@ -402,6 +412,7 @@ while true ; do
 	-e|--echo)		action='echo' ; shift ;;
 	-u|--users)		VOLUMES=users ; shift ;;
 	-i|--incr)		TYPE=incr     ; shift ;;
+	-a|--all)		TYPE=all      ; shift ;;
 	-m|--mount)		MOUNT=1       ; shift ;;
 	-v|--verbose)		verbose=1     ; shift ;;
 	--)			shift ; VOLUMES="$*" ; break ;; 
