@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: afsdb.pl,v 1.2 2003-10-11 08:24:01 turbo Exp $
+# $Id: df_afs.pl,v 1.1 2003-10-11 08:28:27 turbo Exp $
 
 $AFSSERVER="papadoc.bayour.com";
 
