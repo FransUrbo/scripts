@@ -1,0 +1,14 @@
+# Upload the backupfile to papadoc.
+if [ -f /etc/krb5.keytab.backup ]; then
+    kinit -l 4m -k -t /etc/krb5.keytab.backup backup@BAYOUR.COM
+    for file in $BACKUPFILES; do
+	file=`echo $file | sed "s@$BACKUPDIR/@@"`
+	dir=`dirname $file` ; filename=`basename $file`
+	
+	if rcp -D 2106 -x $BACKUPDIR/$file backup@aurora.bayour.com:/var/.backups/$dir/; then
+	    # Successfully uploaded file. Delete it, we don't have any free space!
+	    rm $BACKUPDIR/$file
+	fi
+    done
+    kdestroy
+fi

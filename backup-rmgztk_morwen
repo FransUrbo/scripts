@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup-rmgztk_morwen,v 1.16 2004-10-28 06:11:42 turbo Exp $
+# $Id: backup-rmgztk_morwen,v 1.17 2004-12-22 13:13:25 turbo Exp $
 #
 # Backup script for host: %HOST%
 
@@ -26,6 +26,20 @@ for file in $BACKUPFILES; do
     [ ! -x $dir ] && mkdir -p $dir
 done
 
+echo "Starting system backup ($BACKUP_TYPE) at" `date +"%Y%m%d %H:%M:%S"`
+
+# Support function
+check_error () {
+    local errcode=$1 ; shift
+    local msg="$*"
+
+    if [ "$errcode" = "0" ]; then
+	echo "Successfully backed up $msg."
+    else
+	echo "Failed to backup $msg!"
+    fi
+}
+
 # ----- L D A P -----
 if [ -f /etc/init.d/slapd.backup ]; then
     /etc/init.d/slapd.backup stop > /dev/null 2>&1
@@ -33,9 +47,12 @@ if [ -f /etc/init.d/slapd.backup ]; then
 	-f /etc/ldap/slapd.conf.backup \
 	-l /tmp/ldap.ldif -b 'c=SE' | \
 	egrep -v '^replace:'
+    stat=$?
+
     /etc/init.d/slapd.backup start > /dev/null 2>&1
     cat /tmp/ldap.ldif | bzip2 > $BACKUPFILE2
     rm /tmp/ldap.ldif
+    check_error "$stat" "LDAP database"
 fi
 
 # ----- K E R B E R O S -----
@@ -58,15 +75,12 @@ tar cjpsf $BACKUPFILE1 `find %DIRS% \
 # Logfiles...
 cd /var/log && tar --remove-files -cjf $BACKUPFILE7 `find -name '*.gz'`
 
-# Upload the backupfile to papadoc.
-kinit -l 4m -k -t /etc/krb5.keytab.backup backup@BAYOUR.COM
+# -----------------
 for file in $BACKUPFILES; do
-    file=`echo $file | sed "s@$BACKUPDIR/@@"`
-    dir=`dirname $file` ; filename=`basename $file`
-
-    if rcp -D 2106 -x $BACKUPDIR/$file backup@papadoc.bayour.com:/var/.backups/$dir/; then
-	# Successfully uploaded file. Delete it, we don't have any free space!
-	rm $BACKUPDIR/$file
-    fi
+    chgrp backup $file
+    chmod 640    $file
 done
-kdestroy
+rm -f $BACKUPFILE5
+
+echo "Ending system backup at" `date +"%Y%m%d %H:%M:%S"`
+echo
