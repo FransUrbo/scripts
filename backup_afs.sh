@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.11 2002-10-14 06:28:25 turbo Exp $
+# $Id: backup_afs.sh,v 1.12 2002-10-14 07:04:50 turbo Exp $
 
 cd /
 
@@ -92,6 +92,23 @@ create_backup_volume () {
 }
 
 # --------------
+create_backup_volume () {
+    local vol="$1"
+
+    if [ -z "$action" ]; then
+	if [ "$BACKUP_VOLUMES" -gt 0 ]; then
+	    RES=`vos backup $volume -localauth 2>&1`
+	else
+	    $action vos backup $volume -localauth
+	    RES="Created backup volume for $volume"
+	fi
+    else
+	$action vos backup $volume -localauth
+	RES="Created backup volume for $volume"
+    fi
+}
+
+# --------------
 dump_volume () {
     local vol="$1".backup
     local file="$2"
@@ -132,19 +149,9 @@ do_backup () {
 	[ "$MOUNT" -gt 0 ] && get_vol_mnt $volume
 
 	# Create the backup volume
-	if [ -z "$action" ]; then
-	    if [ "$BACKUP_VOLUMES" -gt 0 ]; then
-		RES=`vos backup $volume -localauth 2>&1`
-	    else
-		$action vos backup $volume -localauth
-		RES="Created backup volume for $volume"
-	    fi
-	else
-	    $action vos backup $volume -localauth
-	    RES="Created backup volume for $volume"
-	fi
+	create_backup_volume $volume
 
-	# Mount the backup volume
+	# Catch errors from the backup volume creation
 	if ! echo $RES | grep -q 'Created backup volume for'; then
 	    echo -n "Could not create backup volume for '$volume' - "
 
@@ -162,6 +169,38 @@ do_backup () {
 		    vos unlock $volume -localauth > /dev/null 2>&1
 		elif echo $RES | grep -q 'VOLSER: volume is busy'; then
 		    echo "volume is busy."
+
+		    # Double check that there IS such a volume
+		    if vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH | grep -q ^$volume; then
+			# No such volume - Is there a $volume.readonly we can use?
+			if vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH | grep -q ^$volume.readonly; then
+			    # There is a readonly (replica) volume.
+			    echo "The volume '$volume' don't exists (anymore!?), but the '$volume.readonly' does..."
+			    TMPFILE=`tempfile -d $BACKUPDIR -p vol.`
+
+			    # Dump the volume into a temporary file
+			    $action vos dump common.source.kernels.readonly -file $TMPFILE
+
+# TODO: Is this safe? Will it ever happen?
+			    # Restore the volume
+#			    $action vos restore -server ${AFSSERVER:-localhost} -partition vicepb \
+#				-name $volume -file $TMPFILE -id $volume -overwrite full \
+#				-localauth
+
+			    # Update the database
+#			    $action fs checkv
+
+			    # Try to create the backup volume again
+#			    create_backup_volume $volume
+
+			    # Catch an error. Unfortunatly it's to cumbersome to do all 
+			    # the previous tests again. I wish there WHERE a goto in sh!
+			    if ! echo $RES | grep -q 'Created backup volume for'; then
+				echo "Could not create backup volume for '$volume' -"
+				echo "Error message:" ; echo "$RES"
+			    fi
+			fi
+		    fi
 		elif echo $RES | grep -q 'Volume needs to be salvaged'; then
 		    # FAILED - salvage volume
 		    echo "Trying to salvage the volume so we can try again"
@@ -299,6 +338,8 @@ if ! tokens | grep -q ^User; then
     if [ "$ID" != "0" ]; then
 	echo "You must have a valid AFS token to do a backup (or be root)." > /dev/stderr
 	exit 1
+#    else
+#	LOCALAUTH="-localauth"
     fi
 fi
 
