@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# $Id: backup,v 1.5 2002-08-29 08:57:07 turbo Exp $
+
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
 BACKUPFILE1=$BACKUPDIR/System/confs-$DATE.tar.bz2
@@ -14,8 +16,6 @@ BACKUPFILE9=$BACKUPDIR/PostgreSQL/postgresql-$DATE.sql.bz2
 BACKUPFILES="$BACKUPFILE1 $BACKUPFILE2 $BACKUPFILE3.gz $BACKUPFILE4 $BACKUPFILE6 $BACKUPFILE7 $BACKUPFILE9"
 BACKUPVOLDIR="/var/.backups-volumes" # Make sure this is the same dir as
 				     # configured in /usr/local/sbin/backup_afs.sh
-
-# $Id: backup,v 1.4 2002-08-28 12:35:55 turbo Exp $
 
 cd /
 
@@ -70,7 +70,10 @@ for dir in $DIR; do
 	X="$X $dir"
     fi
 done
-tar cjpsf $BACKUPFILE8 $X
+if [ ! -z "$X" ]; then
+    tar cjpsf $BACKUPFILE8 $X
+    DO_INCREMENTAL=yes
+fi
 
 # -----------------
 # Some important files...
@@ -129,4 +132,7 @@ if [ -x /usr/local/sbin/backup_afs.sh ]; then
 fi
 
 # Do a INCREMENTAL backup to tape
-incr_backup -d
+if [ ! -z "$DO_INCREMENTAL" ]; then
+    incr_backup -d
+fi
+
