@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: kprop.sh,v 1.1 2002-11-20 19:51:42 turbo Exp $
+# $Id: kprop.sh,v 1.2 2003-03-29 09:45:42 turbo Exp $
 
 kdclist="kerberos2.bayour.com"
 
@@ -16,6 +16,6 @@ for kdc in $kdclist; do
     if [ "$RES" -gt 0 ]; then
     	echo "Result from kprop: '$RES'"
 	cat $TMPFILE
-	rm -f $TMPFILE
     fi
 done
+rm -f $TMPFILE
