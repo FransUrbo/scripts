@@ -1,44 +1,7 @@
 #!/usr/bin/perl -w
 
-# -------------------------------------------------------------------------------------------------------------------
-# Successfull remote delivery:
-# 1054189746.123136 new msg 161214
-# 1054189746.123151 info msg 161214: bytes 830 from <turbo@bayour.com> qp 6190 uid 1000
-# 1054189746.123958 starting delivery 119: msg 161214 to remote turbo@tripnet.se
-# 1054189746.123980 status: local 0/10 remote 1/20
-# 1054189746.373645 delivery 119: success: 195.100.21.7_accepted_message./Remote_host_said:_250_OK_id=19LGuQ-0003OJ-00/
-# 1054189746.374171 status: local 0/10 remote 0/20
-# 1054189746.374332 end msg 161214
-# 
-# Successfull local delivery:
-# 1054189750.812151 new msg 161214
-# 1054189750.812169 info msg 161214: bytes 1676 from <turbo@bayour.com> qp 6206 uid 64014
-# 1054189750.812192 starting delivery 120: msg 161214 to local turbo@bayour.com
-# 1054189750.812212 status: local 1/10 remote 0/20
-# 1054189754.376563 delivery 120: success: did_0+0+1/
-# 1054189754.377277 status: local 0/10 remote 0/20
-# 1054189754.377470 end msg 161214
-#
-# Failed remote delivery 1:
-# 1054194593.322882 new msg 161214
-# 1054194593.322896 info msg 161214: bytes 869 from <turbo@bayour.com> qp 24150 uid 1000
-# 1054194593.322921 starting delivery 183: msg 161214 to remote fjkdasljf@nocrew.org
-# 1054194593.322944 status: local 0/10 remote 1/20
-# 1054194596.057500 delivery 183: failure: 213.242.147.30_does_not_like_recipient./Remote_host_said:_550_Unknown_local_part_fjkdasljf_in_<fjkdasljf@nocrew.org>/Giving_up_on_213.242.147.30./
-# 1054194596.058353 status: local 0/10 remote 0/20
-# 1054194596.081499 bounce msg 161214 qp 24162
-# 1054194596.081517 end msg 161214
-#
-# Failed local delivery:
-# 1054189045.549445 new msg 161214
-# 1054189045.549570 info msg 161214: bytes 7308 from <baby3@3333.3utilities.com> qp 976 uid 64014
-# 1054189045.549657 starting delivery 108: msg 161214 to local 87smtjy4le.fsf@papadoc.bayour.com
-# 1054189045.549681 status: local 1/10 remote 0/20
-# 1054189046.239668 delivery 108: failure: Sorry,_no_mailbox_here_by_that_name._(#5.1.1)/
-# 1054189046.240474 status: local 0/10 remote 0/20
-# 1054189046.260176 bounce msg 161214 qp 981
-# 1054189046.260452 end msg 161214
-# -------------------------------------------------------------------------------------------------------------------
+#$DATE_CONVERTER="/usr/local/bin/tailocal";
+$DATE_CONVERTER="/usr/bin/tai64nlocal";
 
 sub get_msg_nr {
     my($line, $place) = @_;
@@ -205,25 +168,41 @@ exit(0) if(!$msgnr); # We have no statistics - exit
 
 LOOP:
     # Remember the last entry
-    $last = `echo $end{$msgnr} | /usr/local/bin/tailocal`;
-    chomp($last);
+    ($time1, $time2) = split(' ', $line);
+    $time2 = (split('\.', $time2))[0];
+    $last  = "$time1 $time2";
 
     $high = $avg = 0;
     foreach $nr (sort { $begin{$a} <=> $begin{$b} } keys(%begin)) {
 	# Get start and end time of delivery
-	$time1 = `echo $begin{$nr} | /usr/local/bin/tailocal`;
-	$time2 = `echo $end{$nr}   | /usr/local/bin/tailocal` if($end{$nr});
-	chomp($time1); chomp($time2);
+	if($begin{$nr} =~ /\./) {
+	    $time1 = `echo $begin{$nr} | $DATE_CONVERTER`;
+	    chomp($time1);
+	}
+
+	if($end{$nr}) {
+	    if($end{$nr} =~ /\./) {
+		$time2 = `echo $end{$nr}   | $DATE_CONVERTER`;
+	    }
+	    chomp($time2);
+	}
 	
 	# How long did the delivery take?
 	$time3 = $end{$nr} - $begin{$nr} if($end{$nr});
 
 	# Calculate some statistics
-	$high  = $time3 if($time3 > $high);
-	$avg   = $avg + $time3;
+	if($time3) {
+	    $high  = $time3 if($time3 > $high);
+	    $avg   = $avg + $time3;
 	
-	printf("%5d: $time1 - $time2 (%3d sec) -> $dest{$nr}\n", $nr, $time3)
-	    if($allstats && !$quiet);
+	    printf("%5d: $time1 - $time2 (%3d sec) -> $dest{$nr}\n",
+		   $nr, $time3) if($allstats && !$quiet);
+	} else {
+	    # We have not been able to figure out when the message
+	    # was delivered successfully.
+	    printf("%5d: $time1 - ???????? (%3s sec) -> $dest{$nr}\n",
+		   $nr, "?") if($allstats && !$quiet);
+	}
     }
 
     # Output the statistics
