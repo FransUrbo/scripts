@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.26 2003-10-22 05:35:57 turbo Exp $
+# $Id: backup_afs.sh,v 1.27 2003-11-03 12:10:41 turbo Exp $
 
 cd /
 
@@ -442,7 +442,8 @@ if [ ! -z "$MISSING_VOLUMES" ]; then
     sleep 300s
 
     # Backup the missing volumes...
-    do_backup $MISSING_VOLUMES
+    VOLUMES=$MISSING_VOLUMES
+    do_backup
 else
     echo "Successfully backed up AFS volume(s)."
     exit 0
