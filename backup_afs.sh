@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.8 2002-10-08 06:01:40 turbo Exp $
+# $Id: backup_afs.sh,v 1.9 2002-10-09 05:01:57 turbo Exp $
 
 cd /
 
@@ -93,8 +93,8 @@ create_backup_volume () {
 
 # --------------
 dump_volume () {
-    local $vol="$1".backup
-    local $file="$2"
+    local vol="$1".backup
+    local file="$2"
 
     if [ $SIZE -ge $MAXSIZE ]; then
 	# If the volume is bigger than 2Gb, dump in section using 'split'.
