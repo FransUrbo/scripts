@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Id: test-smtp.pl,v 1.5 2002-11-21 10:52:18 turbo Exp $
+# $Id: test-smtp.pl,v 1.6 2002-11-21 11:02:47 turbo Exp $
 
 # Test for SMTP connection on papadoc
 #
@@ -48,8 +48,6 @@ if(&check_smtp()) {
 
 	print "SMTP on papadoc is up - Restarting qmail in DELIVERY mode.\n";
 	system($qmail_stop); system($qmail_start);
-    } else {
-	print ".\n";
     }
 } else {
     # SMTP down
@@ -58,8 +56,6 @@ if(&check_smtp()) {
 
 	print "SMTP on papadoc is down - Restarting qmail in SMTP mode.\n";
 	system($qmail_stop); system($qmail_smtp);
-    } else {
-	print ".\n";
     }
 }
 
