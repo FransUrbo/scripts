@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.21 2003-02-14 17:17:59 turbo Exp $
+# $Id: backup_afs.sh,v 1.22 2003-07-07 09:54:07 turbo Exp $
 
 cd /
 
@@ -395,7 +395,7 @@ if [ "$VOLUMES" = "users" ]; then
     VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet -localauth | grep ^user | egrep -v '^root|readonly|\.backup|\.rescue' | sed 's@\ .*@@'`
 else
     if [ -z "$VOLUMES" ]; then
-	VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet -localauth | egrep -v '^root|readonly|\.backup' | sed 's@\ .*@@'`
+	VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet -localauth | egrep -v '^root|^bogus|readonly|\.backup' | sed 's@\ .*@@'`
     fi
 fi
 VOLUMES=`echo $VOLUMES`
