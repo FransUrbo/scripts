@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: create_cert.sh,v 1.3 2005-03-19 13:04:23 turbo Exp $
+# $Id: create_cert.sh,v 1.4 2005-04-01 10:04:27 turbo Exp $
 
 BASE_DIR=/etc/ssl
 BASE_CFG=$BASE_DIR/openssl.cnf
@@ -55,11 +55,12 @@ if [ -f "server.pubkey" ]; then
     rm server_req.pubkey
     chmod 644 server.privkey server.pubkey
     
-    FILENAME=`egrep 'Subject:.*CN=' server.pubkey | sed -e 's@.*CN=@@' -e 's@/.*@@' -e 's@\.@_@g'`
+    FILENAME=`egrep 'Subject:.*CN=' server.pubkey | sed -e 's@.*CN=@@' -e 's@/.*@@' -e 's@\.@_@g' -e 's@ @_@g'`
     if [ ! -z "$FILENAME" ]; then
 	cat server.pubkey server.privkey > $FILENAME.pem
 	mv server.privkey $FILENAME.prv
 	mv server.pubkey $FILENAME.pub
+	chmod 600 $FILENAME.prv $FILENAME.pub $FILENAME.pem
 
 	echo "Moving files to cert database directory:"
 	[ ! -d "$BASE_DIR/certs/" ] && mkdir -p $BASE_DIR/certs
