@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.23 2003-10-18 15:09:26 turbo Exp $
+# $Id: backup,v 1.24 2004-01-01 17:40:20 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -18,6 +18,27 @@ BACKUPVOLDIR="/var/.backups-volumes" # Make sure this is the same dir as
 				     # configured in /usr/local/sbin/backup_afs.sh
 
 cd /
+
+# --------------
+# Get the CLI options...
+BACKUP_TYPE=incr
+TEMP=`getopt -o hif --long help,incr,full -- "$@"`
+eval set -- "$TEMP"
+while true ; do
+    case "$1" in
+	-h|--help)
+	    echo "Usage:   `basename $0` [option] [volume]"
+	    echo "Options: -h,--help    Show this help"
+	    echo "         -i,--incr    Incremental backup"
+	    echo "         -f,--full    Full backup"
+	    echo; echo "Default is to do a incremental backup"
+	    exit 0
+	    ;;
+	-i|--incr)	BACKUP_TYPE=incr;;
+	-f|--full)	BACKUP_TYPE=full;;
+	*)		BACKUP_TYPE=full;;
+    esac
+done
 
 echo "Starting system backup at" `date +"%Y%m%d %H:%M:%S"`
 
@@ -100,7 +121,6 @@ done
 if [ ! -z "$X" ]; then
     tar cjpsf $BACKUPFILE8 $X
     check_error "$?" "AfBackup directories"
-    DO_INCREMENTAL=yes
 fi
 
 # -----------------
@@ -146,10 +166,10 @@ if [ -x /usr/local/sbin/backup_afs.sh ]; then
     # Do we backup odd or even weeks?
     ODD=`expr \`date +"%V"\` % 2`
     DAY=`date +"%w"`
-    if [ "$DAY" = "1" ]; then
-	# This is a monday, clean the backup directory. We'll
-	# have PREVIOUS weeks backup(s) intact -> At least one
-	# weeks of backup(s) online.
+    if [ "$DAY" = "1" -o "$BACKUP_TYPE" == "full" ]; then
+	# This is a monday (or we've specified full backup), clean
+	# the backup directory. We'll have PREVIOUS weeks backup(s)
+	# intact -> At least one weeks of backup(s) online.
 
 # Unfortunatly I don't have enough space on my backup partition
 # to save two full weeks, therefor I'm deleting ALL backups, and
@@ -176,9 +196,12 @@ if [ -x /usr/local/sbin/backup_afs.sh ]; then
     echo
 fi
 
-# Do a INCREMENTAL backup to tape
-if [ ! -z "$DO_INCREMENTAL" ]; then
+if [ "$BACKUP_TYPE" == "incr" ]; then
+    # Do a INCREMENTAL backup to tape
     incr_backup -d
-    echo
+elif [ "$BACKUP_TYPE" == "full" ]; then
+    # Do a FULL backup to tape
+    full_backup -d
 fi
+echo
 
