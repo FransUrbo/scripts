@@ -1,14 +1,8 @@
 #!/usr/bin/perl -w
 
-$AFSSERVER="papadoc.bayour.com";
+# $Id: afsdb.pl,v 1.2 2003-10-11 08:24:01 turbo Exp $
 
-#[papadoc.pts/8]$ df -h | grep ' /vice'
-#Filesystem            Size  Used Avail Use% Mounted on
-#/dev/sdb7              89M  732k   88M   1% /vicepa
-#/dev/sdf1              24G  328M   22G   2% /vicepc
-#/dev/sdc1             8.4G  624M  7.7G   8% /vicepd
-#/dev/sdd1              17G   16G  1.2G  93% /vicepe
-#/dev/sda1             5.8G   33M  5.7G   1% /vicepf
+$AFSSERVER="papadoc.bayour.com";
 
 print "                                                        {    A F S    }\n";
 print "Filesystem            Size  Used Avail Use% Mounted on  Size Used Avail\n";
@@ -20,8 +14,6 @@ while(!eof(DF)) {
 
     $part = (split(' ', $line))[5];
 
-    #[papadoc.pts/8]$ vos partinfo papadoc /vicepa
-    #Free space on partition /vicepa: 90824 K blocks out of total 91556
     open(VOS, "vos partinfo $AFSSERVER $part |")
 	|| die("Can't vos, $!\n");
     $line = <VOS>; chomp($line);
