@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.25 2004-01-11 16:16:30 turbo Exp $
+# $Id: backup,v 1.26 2004-01-12 10:02:13 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -147,8 +147,11 @@ check_error "$?" "CVS repository"
 
 # -----------------
 # Logfiles...
-cd /var/log && tar --remove-files -cjf $BACKUPFILE7 `find -name '*.gz'`
-check_error "$?" "old logfiles"
+TMP=`find /var/log/*.gz 2> /dev/null | head -n1`
+if [ ! -z $TMP ]; then
+    cd /var/log && tar --remove-files -cjf $BACKUPFILE7 `find -name '*.gz'`
+    check_error "$?" "old logfiles"
+fi
 
 # -----------------
 for file in $BACKUPFILES; do
