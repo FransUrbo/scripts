@@ -1,0 +1,57 @@
+#!/bin/sh
+
+# $Id: backup-rmgztk_morwen,v 1.1 2002-09-14 07:17:11 turbo Exp $
+
+DATE=`date +"%Y%m%d"`
+BACKUPDIR=/var/.backups && mkdir $BACKUPDIR/$DATE
+
+BACKUPDIR=$BACKUPDIR/$DATE
+BACKUPFILE1=$BACKUPDIR/confs-$DATE.tar.bz2
+BACKUPFILE2=$BACKUPDIR/slapd-$DATE.ldif.bz2
+BACKUPFILE3=$BACKUPDIR/krb5-$DATE
+BACKUPFILE5=/etc/dpkg/selections-$DATE
+BACKUPFILE7=$BACKUPDIR/oldlogs-$DATE.tar.bz2
+
+BACKUPFILES="$BACKUPFILE1 $BACKUPFILE2 $BACKUPFILE3.bz2 $BACKUPFILE7"
+
+cd /
+
+# ----- L D A P -----
+/etc/init.d/slapd.backup stop > /dev/null 2>&1
+slapcat -n /var/lib/ldap.backup/COM/id2entry.dbb | \
+    egrep -v '^replace:' | \
+    bzip2 > $BACKUPFILE2
+/etc/init.d/slapd.backup start > /dev/null 2>&1
+
+# ----- K E R B E R O S -----
+kdb5_util dump $BACKUPFILE3
+if [ -f $BACKUPFILE3.dump_ok ]; then
+    bzip2 -9 $BACKUPFILE3
+    rm $BACKUPFILE3.dump_ok
+else
+    echo "Could not dump krb5 db to $BACKUPFILE3!"
+fi
+
+# ----- I M P O R T A N T   C O N F I G F I L E S -----
+dpkg --get-selections | gzip -f9 > $BACKUPFILE5
+tar cjpsf $BACKUPFILE1 `find etc/ldap etc/krb5* etc/lvm* \
+    etc/pam.d var/bind var/lib/named/etc/bind etc/hosts* \
+    etc/qmail etc/tcp.smtp etc/{nsswitch,danted,firewall.block,firewall}.conf \
+    etc/cron* etc/init.d/{qmail,slapd,slapd.backup} \
+    etc/apache etc/profile etc/xinetd.d $BACKUPFILE5 \
+    -type f | egrep -v '~$' | sed -e 's@^/@@' \
+	-e 's@\.dpkg-dist@@' | sort`
+
+# -----------------
+# Logfiles...
+cd /var/log && tar --remove-files -cjf $BACKUPFILE7 `find -name '*.gz'`
+
+# -----------------
+for file in $BACKUPFILES; do
+    chgrp backup $file
+    chmod 640    $file
+done
+rm -f $BACKUPFILE5
+
+cd $BACKUPDIR
+tar --remove-files cf ../backups-$DATE.tar *
