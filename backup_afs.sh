@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.17 2003-01-27 08:05:46 turbo Exp $
+# $Id: backup_afs.sh,v 1.18 2003-01-28 12:55:20 turbo Exp $
 
 cd /
 
@@ -108,7 +108,7 @@ create_backup_volume () {
 
     # Check to see if the volume exists
     if ! vos examine $vol > /dev/null 2>&1; then
-	RES="Volume '$vol' don't exists"
+	RES="1"
     else
 	if [ -z "$action" ]; then
 	    if [ "$BACKUP_VOLUMES" -gt 0 ]; then
@@ -170,7 +170,7 @@ do_backup () {
 	# Catch errors from the backup volume creation
 	if ! echo $RES | grep -q 'Created backup volume for'; then
 	    # FAIL: Could not create backup volume
-	    echo -n "Could not create backup volume for '$volume' - "
+	    [ "$RES" != 1 ] && echo -n "Could not create backup volume for '$volume' - "
 
 	    if echo $RES | grep -q 'VLDB: no such entry'; then
 		# FAIL: Volume don't exists
@@ -250,6 +250,8 @@ do_backup () {
 
 		# Try to backup this volume later...
 		MISSING_VOLUMES="$MISSING_VOLUMES $volume"
+	    elif [ "$RES" != 1 ]; then
+		# Ignore nonexisting volumes
 	    else
 		# Unknown reason
 		echo "just failed for some reason." ; echo "Error message:" ; echo "$RES"
