@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# $Id: backup_afs.sh,v 1.2 2002-08-29 08:51:57 turbo Exp $
+
 cd /
 
 # --------------

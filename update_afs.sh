@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# $Id: update_afs.sh,v 1.2 2002-08-29 08:52:30 turbo Exp $
+
 cd /
 
 # --------------
