@@ -1,12 +1,10 @@
 #!/bin/sh
 
-# $Id: backup,v 1.6 2002-09-03 17:04:09 turbo Exp $
+# $Id: backup,v 1.7 2002-09-14 07:14:18 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
 BACKUPFILE1=$BACKUPDIR/System/confs-$DATE.tar.bz2
-BACKUPFILE2=$BACKUPDIR/OpenLDAP/slapd-$DATE.ldif.bz2
-BACKUPFILE3=$BACKUPDIR/KerberosV/krb5-$DATE
 BACKUPFILE4=$BACKUPDIR/OpenAFS/afsd-$DATE.gz
 BACKUPFILE5=/etc/dpkg/selections-$DATE
 BACKUPFILE6=$BACKUPDIR/Important/important-$DATE.tar.bz2
@@ -18,22 +16,6 @@ BACKUPVOLDIR="/var/.backups-volumes" # Make sure this is the same dir as
 				     # configured in /usr/local/sbin/backup_afs.sh
 
 cd /
-
-# ----- L D A P -----
-/etc/init.d/slapd.backup stop > /dev/null 2>&1
-slapcat -n /var/lib/ldap.backup/COM/id2entry.dbb | \
-    egrep -v '^replace:' | \
-    bzip2 > $BACKUPFILE2
-/etc/init.d/slapd.backup start > /dev/null 2>&1
-
-# ----- K E R B E R O S -----
-kdb5_util dump $BACKUPFILE3
-if [ -f $BACKUPFILE3.dump_ok ]; then
-    gzip -f9 $BACKUPFILE3
-    rm $BACKUPFILE3.dump_ok
-else
-    echo "Could not dump krb5 db to $BACKUPFILE3!"
-fi
 
 # ----- A F S -----
 DIR=etc/openafs
@@ -78,14 +60,17 @@ fi
 # -----------------
 # Some important files...
 kinit -l 4m -k -t /etc/krb5.keytab.webserver webserver@BAYOUR.COM && aklog
-mkdir /tmp/$$ && ( \
+mkdir /tmp/$$ && chmod 700 /tmp/$$ && ( \
     cd /var/www/bayour && cp LDAPv3-HOWTO.html /tmp/$$; \
     find kerberos openldap | cpio -p /tmp/$$ 2> /dev/null; \
+    cd /afs/bayour.com/user/fredriksson/turbo/secret && \
+    mkdir /tmp/$$/Implementing_LDAPv3 && \
+    find Implementing_LDAPv3.sdw LDAPv3 LDAPv3 | cpio -vp \
+    /tmp/$$/Implementing_LDAPv3 2> /dev/null; \
+    cd /var/www/bayour/secret.old/LDAPv3/Softwares && \
+    find -type f -exec ls -ln {} \; > /tmp/$$/LDAPv3_install.filelist; \
 ) && cd /tmp/$$ && tar cjpsf $BACKUPFILE6 . && rm -R /tmp/$$
-# These have moved into /afs/bayour. How do we do a backup?? TODO
-#    cd secret && cp Implementing_LDAPv3.sdw /tmp/$$; \
-#    find LDAPv3 -type f -exec ls -ln {} \; > /tmp/$$/LDAPv3_install.filelist; \
-kdestroy
+unlog && kdestroy
 
 # -----------------
 # Logfiles...
