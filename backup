@@ -1,12 +1,12 @@
 #!/bin/sh
 
-# $Id: backup,v 1.10 2002-10-03 10:33:07 turbo Exp $
+# $Id: backup,v 1.11 2002-10-03 10:54:33 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
 BACKUPFILE1=$BACKUPDIR/System/confs-$DATE.tar.bz2
 BACKUPFILE4=$BACKUPDIR/OpenAFS/afsd-$DATE.gz
-BACKUPFILE5=/etc/dpkg/selections-$DATE
+BACKUPFILE5=/etc/dpkg/selections-$DATE.gz
 BACKUPFILE6=$BACKUPDIR/Important/important-$DATE.tar.bz2
 BACKUPFILE7=$BACKUPDIR/Logs/oldlogs-$DATE.tar.bz2
 BACKUPFILE8=$BACKUPDIR/AFBackup/afbackup_var-$DATE.tar.bz2
@@ -32,7 +32,7 @@ cat $TMPFILE | bzip2 > $BACKUPFILE9
 rm -f $TMPFILE
 
 # ----- I M P O R T A N T   C O N F I G F I L E S -----
-dpkg --get-selections \* | gzip -f9 > $BACKUPFILE5
+dpkg --get-selections \* | sort | gzip -f9 > $BACKUPFILE5
 tar cjpsf $BACKUPFILE1 `find etc/ldap etc/krb5* etc/lvm* \
     etc/roxen2 etc/pam.d etc/bind etc/{libnss-,pam_}ldap.conf \
     etc/auto.master etc/hosts* etc/qmail etc/tcp.{smtp,qmqp} \
