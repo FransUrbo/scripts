@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# $Id: cron.weekly,v 1.1 2003-02-06 08:41:19 turbo Exp $
+
+DATE=`date +"%Y%m%d"`
+DIR=/var/.backups
+OLD=/var/.backups-oldbackups/OldBackups
+
+for file in `find $DIR -type f | egrep -v "$DIR/SweNET|$DIR/bin|$DIR/\."`; do
+    #echo "File: $file"
+    mv $file $OLD/
+done
+
+SIZE=`du -s $OLD | sed 's@	.*@@'`
+if [ "$SIZE" -gt 600000 ]; then
+    cat <<EOF | mailx -s "$DATE - Time to make an ISO of the old backups" turbo@bayour.com
+Directory $OLD is to big ($SIZE bytes).
+
+It's time to make an ISO out of the directory!.
+EOF
+fi
