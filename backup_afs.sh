@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.3 2002-09-15 12:49:18 turbo Exp $
+# $Id: backup_afs.sh,v 1.4 2002-09-15 13:05:56 turbo Exp $
 
 cd /
 
@@ -164,7 +164,10 @@ do_backup () {
 		last_modified "$BACKUPDIR/$TYPE-$volume-"
 
 		if [ ! -z "$DATE" ]; then
-		    [ ! -z "$verbose" ] && echo -n "dump > '$DATE', "
+		    if [ ! -z "$verbose" ]; then
+			echo "                           dump > '$DATE'"
+			echo -n "                           "
+		    fi
 		    TIMEARG="-time $DATE"
 		else
 		    BACKUPFILE="$BACKUPDIR/full-$volume-$CURRENTDATE"
