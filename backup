@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.17 2003-03-01 09:57:44 turbo Exp $
+# $Id: backup,v 1.18 2003-03-14 07:37:17 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -19,24 +19,35 @@ BACKUPVOLDIR="/var/.backups-volumes" # Make sure this is the same dir as
 
 cd /
 
+# Support function
+check_error () {
+    local errcode=$1 ; shift
+    local msg="$*"
+
+    if [ "$errcode" == "0" ]; then
+	echo "Successfully backed up $msg."
+    else
+	echo "Failed to backup $msg!"
+    fi
+}
+
 # ----- A F S -----
 DIR=etc/openafs
 if [ -d "$DIR" ]; then
     cd /  && tar cjpf $BACKUPFILE4 \
 	$DIR/CellServDB $DIR/afs.conf* $DIR/ThisCell \
 	$DIR/server $DIR/cacheinfo var/lib/openafs/db/*.DB0
+    check_error "$?" "AFS database"
 fi
 
 # ----- P O S T G R E S Q L -----
 TMPFILE=`tempfile -p psql.` ; chown postgres $TMPFILE ; chmod 600 $TMPFILE
 su postgres -c "/usr/lib/postgresql/bin/pg_dumpall -c > $TMPFILE 2> /dev/null"
-if [ "$?" == "0" ]; then
-    echo "Successfully backed up PostgreSQL database(s)."
+code=$? ; check_error "$?" "PostgreSQL database(s)"
+if [ "$code" == "0" ]; then
     cat $TMPFILE | bzip2 > $BACKUPFILE9
-else
-    echo "Failed to backup PostgreSQL database(s)!"
+    rm -f $TMPFILE
 fi
-rm -f $TMPFILE
 
 # ----- M y S Q L -----
 TMPFILE=`tempfile -p mysql.` ; chown mysql $TMPFILE ; chmod 600 $TMPFILE
@@ -44,13 +55,11 @@ USER=`cat /root/.my.cnf | grep ^user | sed 's@.*= @@'`
 PASS=`cat /root/.my.cnf | grep ^pass | sed 's@.*= @@'`
 /usr/bin/mysqldump -u $USER --password=$PASS \
     -Aaclt --add-drop-table --add-locks > $TMPFILE
-if [ "$?" == "0" ]; then
-    echo "Successfully backed up MySQL database(s)."
+code=$? ; check_error "$?" "MySQL database(s)"
+if [ "$code" == "0" ]; then
     cat $TMPFILE | bzip2 > $BACKUPFILE2
-else
-    echo "Failed to backup MySQL database(s)!"
+    rm -f $TMPFILE
 fi
-rm -f $TMPFILE
 
 # ----- I M P O R T A N T   C O N F I G F I L E S -----
 dpkg --get-selections \* | sort | gzip -f9 > $BACKUPFILE5
@@ -64,6 +73,7 @@ tar cjpsf $BACKUPFILE1 `find etc/ldap etc/krb5* etc/lvm* \
     etc/krb5.keytab* etc/postgresql/{pg_hba,postgresql}.conf \
     etc/ssl/{openssl.cnf,CA,certs} $BACKUPFILE5 -type f \
     | egrep -v '~$' | sed -e 's@^/@@' -e 's@\.dpkg-dist@@' | sort`
+check_error "$?" "misc config files"
 
 # -----------------
 # AFBackup var directory for easy restore incase of crash
@@ -75,6 +85,7 @@ for dir in $DIR; do
 done
 if [ ! -z "$X" ]; then
     tar cjpsf $BACKUPFILE8 $X
+    check_error "$?" "AfBackup directories"
     DO_INCREMENTAL=yes
 fi
 
@@ -90,15 +101,18 @@ mkdir /tmp/$$ && chmod 700 /tmp/$$ && ( \
     cd /var/www/bayour/secret.old/LDAPv3/Softwares && \
     find -type f -exec ls -ln {} \; > /tmp/$$/LDAPv3_install.filelist; \
 ) && cd /tmp/$$ && tar cjpsf $BACKUPFILE6 . && rm -R /tmp/$$
+check_error "$?" "very important files"
 unlog && kdestroy
 
 # -----------------
 # CVS archive
 cd / && tar cjpsf $BACKUPFILE10 var/cvs
+check_error "$?" "CVS repository"
 
 # -----------------
 # Logfiles...
 cd /var/log && tar --remove-files -cjf $BACKUPFILE7 `find -name '*.gz'`
+check_error "$?" "old logfiles"
 
 # -----------------
 for file in $BACKUPFILES; do
