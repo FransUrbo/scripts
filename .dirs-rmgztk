@@ -1,6 +1,6 @@
 etc/ldap etc/krb5* \\\
-    var/lib/named/etc/bind etc/hosts* etc/cron* \\\
-    etc/{pam.d,qmail,xinetd.d,apache,tcp.smtp} \\\
+    var/lib/named/etc/bind /var/lib/named/var/cache/bind \\\
+    etc/hosts* etc/cron* etc/{pam.d,qmail,xinetd.d,apache,tcp.smtp} \\\
     etc/{nsswitch,danted,firewall.block,firewall}.conf \\\
     etc/{profile,mailname,hostname,network/interfaces} \\\
     etc/init.d/{qmail,slapd,slapd.backup} \$BACKUPFILE5
