@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.4 2002-09-15 13:05:56 turbo Exp $
+# $Id: backup_afs.sh,v 1.5 2002-10-07 06:23:37 turbo Exp $
 
 cd /
 
@@ -57,7 +57,7 @@ get_vol_mnt () {
 # FUNCTION: Find the partition the volume is on
 get_vol_part () {
     PART=`vos examine $1 -localauth | sed 1d | head -n1 | sed 's@.*/@/@'`
-    [ ! -z "$action" -o ! -z "$verbose" ] && echo "Partition for volume $volume is $PART"
+    [ ! -z "$action" -o ! -z "$verbose" ] && printf "%-65s" "Partition for volume $volume is $PART"
 }
 
 # --------------
@@ -165,8 +165,7 @@ do_backup () {
 
 		if [ ! -z "$DATE" ]; then
 		    if [ ! -z "$verbose" ]; then
-			echo "                           dump > '$DATE'"
-			echo -n "                           "
+			echo "dump > '$DATE'"
 		    fi
 		    TIMEARG="-time $DATE"
 		else
@@ -174,6 +173,7 @@ do_backup () {
 		fi
 	    fi
 	
+    DUMP:
 	    # Do the backup
 	    if [ $SIZE -ge $MAXSIZE ]; then
 		# If the volume is bigger than 2Gb, dump in section using 'split'.
@@ -193,6 +193,13 @@ do_backup () {
 	    if echo $RES | grep -q 'Dumped volume'; then
 		RES=`echo $RES | sed 's@.* /@/@'`
 		[ ! -z "$verbose" ] && echo "$RES"
+	    elif echo $RES | grep -q 'VLDB: vldb entry is already locked'; then
+		if [ "$unlock" != "$volume" ]; then
+		    # We haven't unlocked this volume before
+		    vos unlockvldb $volume > /dev/null 2>&1
+		    unlock=$volume
+		    goto DUMP
+		fi
 	    fi
 
 	    if [ -z "$?" ]; then
