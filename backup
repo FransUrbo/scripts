@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.13 2002-12-12 15:37:42 turbo Exp $
+# $Id: backup,v 1.14 2003-01-08 09:53:13 turbo Exp $
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
@@ -28,7 +28,7 @@ fi
 
 # ----- P O S T G R E S Q L -----
 TMPFILE=`tempfile -p psql.` ; chown postgres $TMPFILE
-su postgres -c "/usr/lib/postgresql/bin/pg_dumpall -c > $TMPFILE 2> /dev/null"
+su postgres -c "/usr/lib/postgresql/bin/pg_dumpall -c > $TMPFILE"
 cat $TMPFILE | bzip2 > $BACKUPFILE9
 rm -f $TMPFILE
 
