@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: update_afs.sh,v 1.3 2002-08-29 08:54:27 turbo Exp $
+# $Id: update_afs.sh,v 1.4 2002-08-29 09:16:41 turbo Exp $
 
 cd /
 
@@ -61,11 +61,12 @@ VOLUMES=`echo $VOLUMES`
 
 for vol in $VOLUMES; do
     [ ! -z "$verbose" ] && echo -n "Releasing volume: $vol"
-    RES=`vos release $vol 2>&1`
+    RES=`vos release $vol $LOCALAUTH 2>&1`
     res=$?
     if [ "$res" != "0" ]; then
 	# An error occured!
-	echo "Could not release volume $vol - $res/$RES"
+	RES=`echo $RES | sed 's@Could not lock.*@@'`
+	echo "ERROR: Could not release volume $vol - $res/$RES"
     else
 	[ ! -z "$verbose" ] && echo " -> $res"
     fi
