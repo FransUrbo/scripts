@@ -1,54 +1,32 @@
 #!/bin/sh
 
-# $Id: backup,v 1.30 2004-12-22 13:11:10 turbo Exp $
+# $Id: backup,v 1.31 2005-05-17 04:53:46 turbo Exp $
+#
+# Backup script for host: aurora
 
 DATE=`date +"%Y%m%d"`
 BACKUPDIR=/var/.backups
-BACKUPFILE1=$BACKUPDIR/System/confs-$DATE.tar.bz2
-BACKUPFILE2=$BACKUPDIR/MySQL/mysql-$DATE.sql.bz2
-BACKUPFILE4=$BACKUPDIR/OpenAFS/afsd-$DATE.gz
-BACKUPFILE5=/etc/dpkg/selections-$DATE.gz
-BACKUPFILE6=$BACKUPDIR/Important/important-$DATE.tar.bz2
-BACKUPFILE7=$BACKUPDIR/Logs/oldlogs-$DATE.tar.bz2
-BACKUPFILE8=$BACKUPDIR/AFBackup/afbackup_var-$DATE.tar.bz2
-BACKUPFILE9=$BACKUPDIR/PostgreSQL/postgresql-$DATE.sql.bz2
-BACKUPFILE10=$BACKUPDIR/CVS/cvs-$DATE.tar.bz2
-BACKUPFILES="$BACKUPFILE1 $BACKUPFILE2 $BACKUPFILE4 $BACKUPFILE6 $BACKUPFILE7 $BACKUPFILE9 $BACKUPFILE10"
-BACKUPVOLDIR="/var/.backups-volumes" # Make sure this is the same dir as
-				     # configured in /usr/local/sbin/backup_afs.sh
+HOSTNAME=`hostname`
 
-# --------------
-# Do a full backup every sunday
-DAY=`date +"%w"`
-if [ "$DAY" = "7" ]; then
-    BACKUP_TYPE=full
-else
-    BACKUP_TYPE=incr
-fi
+if [ -f /etc/init.d/slapd.provider ]; then
+    BACKUPFILE2=$BACKUPDIR/OpenLDAP/slapd-$HOSTNAME-$DATE.ldif.bz2
+fi    
+BACKUPFILE3=$BACKUPDIR/KerberosV/$HOSTNAME-krb5-$DATE
+BACKUPFILE4=$BACKUPDIR/MySQL/mysql-$DATE.sql.bz2
+BACKUPFILE5=/etc/dpkg/selections-$DATE.gz
+BACKUPFILE6=$BACKUPDIR/OpenAFS/afsd-$DATE.gz
+BACKUPFILE7=$BACKUPDIR/Logs/$HOSTNAME-oldlogs-$DATE.tar.bz2
+BACKUPFILE9=$BACKUPDIR/PostgreSQL/postgresql-$DATE.sql.bz2
+
+BACKUPFILES="$BACKUPFILE2 $BACKUPFILE3.bz2 $BACKUPFILE4 $BACKUPFILE6 $BACKUPFILE7 $BACKUPFILE9"
 
 cd /
 
-# --------------
-# Get the CLI options...
-if [ ! -z "$@" ]; then
-    TEMP=`getopt -o hif --long help,incr,full -- "$@"`
-    eval set -- "$TEMP"
-    while true ; do
-	case "$1" in
-	    -h|--help)
-		echo "Usage:   `basename $0` [option] [volume]"
-		echo "Options: -h,--help    Show this help"
-		echo "         -i,--incr    Incremental backup"
-		echo "         -f,--full    Full backup"
-		echo; echo "Default is to do a incremental backup"
-		exit 0
-		;;
-	    -i|--incr)	BACKUP_TYPE=incr;;
-	    -f|--full)	BACKUP_TYPE=full;;
-	    *)		BACKUP_TYPE=full;;
-	esac
-    done
-fi
+# Make sure the directoris exists.
+for file in $BACKUPFILES; do
+    dir=`dirname $file`
+    [ ! -x $dir ] && mkdir -p $dir
+done
 
 echo "Starting system backup ($BACKUP_TYPE) at" `date +"%Y%m%d %H:%M:%S"`
 
@@ -64,15 +42,43 @@ check_error () {
     fi
 }
 
+# ----- L D A P -----
+if [ -f /etc/init.d/slapd.provider ]; then
+    /etc/init.d/slapd.provider stop > /dev/null 2>&1
+    slapcat -m -b 'c=SE' -l $BACKUPFILE2 -f /etc/ldap/slapd.conf.provider #> /dev/null 2>&1
+    /etc/init.d/slapd.provider start > /dev/null 2>&1
+    bzip2 $BACKUPFILE2
+fi
+
+# ----- K E R B E R O S -----
+kdb5_util dump $BACKUPFILE3
+if [ -f $BACKUPFILE3.dump_ok ]; then
+    bzip2 -9 $BACKUPFILE3
+    rm $BACKUPFILE3.dump_ok
+else
+    echo "Could not dump krb5 db to $BACKUPFILE3!"
+fi
+
 # ----- A F S -----
 DIR=etc/openafs
 if [ -d "$DIR" ]; then
     /usr/local/bin/list_afs_vols.sh -f > $DIR/volumes.txt
-    cd /  && tar cjpf $BACKUPFILE4 \
+    cd /  && tar cjpf $BACKUPFILE6 \
 	$DIR/CellServDB $DIR/afs.conf* $DIR/ThisCell \
 	$DIR/server $DIR/cacheinfo $DIR/volumes.txt \
 	var/lib/openafs/db/*.DB0
     check_error "$?" "AFS database"
+fi
+
+# ----- M y S Q L -----
+TMPFILE=`tempfile -p mysql.` ; chown mysql $TMPFILE ; chmod 600 $TMPFILE
+USER=`cat /root/.my.cnf | grep ^user | sed 's@.*= @@'`
+PASS=`cat /root/.my.cnf | grep ^pass | sed 's@.*= @@'`
+/usr/bin/mysqldump -u $USER --password=$PASS -A --opt > $TMPFILE
+code=$? ; check_error "$?" "MySQL database(s)"
+if [ "$code" = "0" ]; then
+    cat $TMPFILE | bzip2 > $BACKUPFILE4
+    rm -f $TMPFILE
 fi
 
 # ----- P O S T G R E S Q L -----
@@ -95,72 +101,11 @@ else
     rm -f $TMPFILE
 fi
 
-# ----- M y S Q L -----
-TMPFILE=`tempfile -p mysql.` ; chown mysql $TMPFILE ; chmod 600 $TMPFILE
-USER=`cat /root/.my.cnf | grep ^user | sed 's@.*= @@'`
-PASS=`cat /root/.my.cnf | grep ^pass | sed 's@.*= @@'`
-/usr/bin/mysqldump -u $USER --password=$PASS -A --opt > $TMPFILE
-code=$? ; check_error "$?" "MySQL database(s)"
-if [ "$code" = "0" ]; then
-    cat $TMPFILE | bzip2 > $BACKUPFILE2
-    rm -f $TMPFILE
-fi
-
-# ----- I M P O R T A N T   C O N F I G F I L E S -----
+# ----- P A C K A G E   S E L E C T I O N -----
 dpkg --get-selections \* | sort | gzip -f9 > $BACKUPFILE5
-tar cjpsf $BACKUPFILE1 `find etc/ldap etc/krb5* etc/lvm* \
-    etc/roxen2 etc/pam.d /etc/{libnss-,pam_}ldap.conf \
-    etc/auto.master etc/hosts* etc/qmail etc/tcp.{smtp,qmqp} \
-    etc/{nsswitch,squid,watchdog,danted,firewall.block,firewall}.conf \
-    usr/lib/squid/ldap_auth.alan_sparks etc/apache etc/cron* \
-    etc/init.d/{qmail,firewall} etc/profile etc/courier \
-    etc/logcheck/ignore.d.server/papadoc etc/xinetd.d \
-    etc/krb5.keytab* etc/postgresql/{pg_hba,postgresql}.conf \
-    etc/ssl/{openssl.cnf,CA,certs} etc/imapd.conf \
-    var/cache/debconf/*.dat $BACKUPFILE5 -type f \
-    | egrep -v '~$' | sed -e 's@^/@@' -e 's@\.dpkg-dist@@' | sort`
-check_error "$?" "misc config files"
 
-# -----------------
-# AFBackup var directory for easy restore incase of crash
-DIR="var/lib/afbackup etc/afbackup" ; X=
-for dir in $DIR; do
-    if [ -d $dir ]; then
-	X="$X $dir"
-    fi
-done
-if [ ! -z "$X" ]; then
-    tar cjpsf $BACKUPFILE8 $X
-    check_error "$?" "AfBackup directories"
-fi
-
-# -----------------
-# Some important files...
-kinit -l 4m -k -t /etc/krb5.keytab.webserver webserver@BAYOUR.COM && aklog
-mkdir /tmp/$$ && chmod 700 /tmp/$$ && ( \
-    cd /var/www/bayour && cp LDAPv3-HOWTO.html /tmp/$$; \
-    find kerberos openldap | cpio -p /tmp/$$ 2> /dev/null; \
-    cd /afs/bayour.com/user/fredriksson/turbo/secret && \
-    mkdir /tmp/$$/Implementing_LDAPv3 && \
-    find LDAPv3 | cpio -vp /tmp/$$/Implementing_LDAPv3 2> /dev/null; \
-    cd /var/www/bayour/secret.old/LDAPv3/Softwares && \
-    find -type f -exec ls -ln {} \; > /tmp/$$/LDAPv3_install.filelist; \
-) && cd /tmp/$$ && tar cjpsf $BACKUPFILE6 . && rm -R /tmp/$$
-check_error "$?" "very important files"
-unlog && kdestroy
-
-# -----------------
-# CVS archive
-cd / && tar cjpsf $BACKUPFILE10 var/cvs
-check_error "$?" "CVS repository"
-
-# -----------------
 # Logfiles...
-TMP=`find /var/log/*.gz 2> /dev/null | head -n1`
-if [ ! -z $TMP ]; then
-    cd /var/log && tar --remove-files -cjf $BACKUPFILE7 `find -name '*.gz'`
-    check_error "$?" "old logfiles"
-fi
+cd /var/log && tar --remove-files -cjf $BACKUPFILE7 `find -name '*.gz'`
 
 # -----------------
 for file in $BACKUPFILES; do
