@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.33 2004-12-22 13:15:13 turbo Exp $
+# $Id: backup_afs.sh,v 1.34 2005-05-17 04:33:11 turbo Exp $
 
 cd /
 
@@ -383,9 +383,9 @@ MOUNT=0 ; BACKUP_VOLUMES=1 ; DELETE_VOLUMES=1
 # Do we backup odd or even weeks?
 ODD=`expr \`date +"%V"\` % 2`
 if [ "$ODD" != "1" ]; then
-    BACKUPDIR="/mnt/chroot/Backups-Volumes/odd"
+    BACKUPDIR="/var/.backups/Volumes/odd"
 else
-    BACKUPDIR="/mnt/chroot/Backups-Volumes/even"
+    BACKUPDIR="/var/.backups/Volumes/even"
 fi
 
 if [ ! -d "$BACKUPDIR" ]; then
