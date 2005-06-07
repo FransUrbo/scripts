@@ -28,7 +28,7 @@ exit(1) if(! $DEST);
 
 # -------------------------
 
-open(LIST, "find -type f -maxdepth 1 |");
+open(LIST, "find -type f -maxdepth 1 \| sort |");
 while(! eof(LIST) ) {
     $file = <LIST>;
     chomp($file);
