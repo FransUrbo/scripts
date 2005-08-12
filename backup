@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.32 2005-05-31 11:17:25 turbo Exp $
+# $Id: backup,v 1.33 2005-08-12 09:34:29 turbo Exp $
 #
 # Backup script for host: aurora
 
@@ -10,7 +10,7 @@ HOSTNAME=`hostname`
 
 BACKUPFILE1=$BACKUPDIR/System/$HOSTNAME-confs-$DATE.tar.bz2
 if [ -f /etc/init.d/slapd.provider ]; then
-    BACKUPFILE2=$BACKUPDIR/OpenLDAP/slapd-$HOSTNAME-$DATE.ldif.bz2
+    BACKUPFILE2=$BACKUPDIR/OpenLDAP/slapd-$HOSTNAME-$DATE.ldif
 fi    
 BACKUPFILE3=$BACKUPDIR/KerberosV/$HOSTNAME-krb5-$DATE
 BACKUPFILE4=$BACKUPDIR/MySQL/mysql-$DATE.sql.bz2
@@ -46,7 +46,10 @@ check_error () {
 # ----- L D A P -----
 if [ -f /etc/init.d/slapd.provider ]; then
     /etc/init.d/slapd.provider stop > /dev/null 2>&1
+
+    cd /var/lib/ldap.provider/ && db4.2_recover && db4.2_archive -d
     slapcat -m -b 'c=SE' -l $BACKUPFILE2 -f /etc/ldap/slapd.conf.provider #> /dev/null 2>&1
+
     /etc/init.d/slapd.provider start > /dev/null 2>&1
     bzip2 $BACKUPFILE2
 fi
