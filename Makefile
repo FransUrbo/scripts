@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.40 2005-06-07 17:03:36 turbo Exp $
+# $Id: Makefile,v 1.41 2005-08-21 18:46:35 turbo Exp $
 
 sBIN		= /afs/bayour.com/common/noarch/sbin
 uBIN		= /afs/bayour.com/common/noarch/bin
@@ -44,6 +44,7 @@ install all:	clean
 	  rcp -x bind9-snmp-stats.pl root@aurora:/etc/snmp/; \
 	  rcp -x snmp.conf.stub snmpd.conf.stub root@aurora:/etc/snmp/; \
 	  rcp -x BAYOUR-COM-MIB.txt root@aurora:/usr/share/snmp/mibs/; \
+	  rcp -x check_slapd-bind9.sh root@aurora:/usr/local/sbin/; \
 	  cp update_{incoming,packages}.sh /home/ftp/bin/; \
 	  echo)
 
