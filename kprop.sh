@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: kprop.sh,v 1.4 2005-01-31 08:50:28 turbo Exp $
+# $Id: kprop.sh,v 1.5 2005-10-28 07:41:45 turbo Exp $
 
 kdclist="kerberos2.bayour.com"
 
@@ -50,7 +50,7 @@ for kdc in $kdclist; do
     /usr/sbin/kprop -f /var/lib/krb5kdc/slave_datatrans $kdc > /dev/null 2> $TMPFILE
     RES="$?"
     if [ "$RES" -gt 0 ]; then
-    	echo "Result from kprop: '$RES'"
+    	echo "Result from kprop ($kdc): '$RES'"
 	cat $TMPFILE
     fi
 done
