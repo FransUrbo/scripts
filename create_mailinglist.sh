@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: create_mailinglist.sh,v 1.1 2005-10-29 09:27:01 turbo Exp $
+# $Id: create_mailinglist.sh,v 1.2 2005-10-29 09:39:16 turbo Exp $
 
 # -a Archived
 # -d Digest
@@ -33,6 +33,6 @@ for list in $LISTS; do
         (cd ~alias && chown alias.qmail .qmail-$list*)
         (cd /var/lists && chown alias.www-data $list)
 
-        find /var/lists/$list -type d -exec chmod 770 {} \;
-        find /var/lists/$list -type f -exec chmod 600 {} \;
+        find /var/lists/$list -type d -exec chmod 755 {} \;
+        find /var/lists/$list -type f -exec chmod 644 {} \;
 done
