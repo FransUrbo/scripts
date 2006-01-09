@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.33 2005-08-12 09:34:29 turbo Exp $
+# $Id: backup,v 1.34 2006-01-09 13:14:37 turbo Exp $
 #
 # Backup script for host: aurora
 
@@ -21,7 +21,12 @@ BACKUPFILE9=$BACKUPDIR/PostgreSQL/postgresql-$DATE.sql.bz2
 
 BACKUPFILES="$BACKUPFILE1 $BACKUPFILE2 $BACKUPFILE3.bz2 $BACKUPFILE4 $BACKUPFILE6 $BACKUPFILE7 $BACKUPFILE9"
 
+if [ ! -z "$1" ]; then
+    BACKUP_TYPE=$1
+fi
+
 cd /
+renice +5 $$
 
 # Make sure the directoris exists.
 for file in $BACKUPFILES; do
@@ -47,17 +52,18 @@ check_error () {
 if [ -f /etc/init.d/slapd.provider ]; then
     /etc/init.d/slapd.provider stop > /dev/null 2>&1
 
-    cd /var/lib/ldap.provider/ && db4.2_recover && db4.2_archive -d
+    pushd /var/lib/ldap.provider/ > /dev/null 2>&1 && db4.2_recover && db4.2_archive -d
     slapcat -m -b 'c=SE' -l $BACKUPFILE2 -f /etc/ldap/slapd.conf.provider #> /dev/null 2>&1
+    popd > /dev/null 2>&1
 
     /etc/init.d/slapd.provider start > /dev/null 2>&1
-    bzip2 $BACKUPFILE2
+    bzip2 -f9 $BACKUPFILE2
 fi
 
 # ----- K E R B E R O S -----
 kdb5_util dump $BACKUPFILE3
 if [ -f $BACKUPFILE3.dump_ok ]; then
-    bzip2 -9 $BACKUPFILE3
+    bzip2 -f9 $BACKUPFILE3
     rm $BACKUPFILE3.dump_ok
 else
     echo "Could not dump krb5 db to $BACKUPFILE3!"
@@ -67,7 +73,7 @@ fi
 DIR=etc/openafs
 if [ -d "$DIR" ]; then
     /usr/local/bin/list_afs_vols.sh -f > $DIR/volumes.txt
-    cd /  && tar cjpf $BACKUPFILE6 \
+    tar cjpf $BACKUPFILE6 \
 	$DIR/CellServDB $DIR/afs.conf* $DIR/ThisCell \
 	$DIR/server $DIR/cacheinfo $DIR/volumes.txt \
 	var/lib/openafs/db/*.DB0
@@ -78,15 +84,15 @@ fi
 TMPFILE=`tempfile -d /var/.backups/tmp -p mysql.` ; chown mysql $TMPFILE ; chmod 600 $TMPFILE
 USER=`cat /root/.my.cnf | grep ^user | sed 's@.*= @@'`
 PASS=`cat /root/.my.cnf | grep ^pass | sed 's@.*= @@'`
-/usr/bin/mysqldump -u $USER --password=$PASS -A --opt > $TMPFILE
+/usr/bin/mysqldump -C -u $USER --password=$PASS -A --opt > $TMPFILE
 code=$? ; check_error "$?" "MySQL database(s)"
 if [ "$code" = "0" ]; then
-    cat $TMPFILE | bzip2 > $BACKUPFILE4
-    rm -f $TMPFILE
+    cat $TMPFILE | bzip2 -f9 > $BACKUPFILE4
 fi
+rm -f $TMPFILE
 
 # ----- P O S T G R E S Q L -----
-TMPFILE=`tempfile -d /var/.backups/tmp -p psql.` ; chown postgres $TMPFILE ; chmod 600 $TMPFILE
+TMPFILE=`tempfile -d /var/.backups/tmp -p pgsql.` ; chown postgres $TMPFILE ; chmod 600 $TMPFILE
 su postgres -c "/usr/lib/postgresql/bin/pg_dumpall -c > $TMPFILE 2> /dev/null"
 code=$? ; check_error "$code" "PostgreSQL database(s)"
 if [ "$code" != "0" ]; then
@@ -101,9 +107,9 @@ if [ "$code" != "0" ]; then
 	fi
     fi
 else
-    cat $TMPFILE | bzip2 > $BACKUPFILE9
-    rm -f $TMPFILE
+    cat $TMPFILE | bzip2 -f9 > $BACKUPFILE9
 fi
+rm -f $TMPFILE
 
 # ----- I M P O R T A N T   C O N F I G F I L E S -----
 dpkg --get-selections \* | sort | gzip -f9 > $BACKUPFILE5
@@ -120,13 +126,15 @@ tar cjpsf $BACKUPFILE1 `find etc/ldap etc/krb5* \
 # -----------------
 # Logfiles...
 if [ "$FILES" != '' ]; then
-    cd /var/log && tar --remove-files -cjf $BACKUPFILE7 `find -name '*.gz'`
+    pushd /var/log > /dev/null 2>&1 && tar --remove-files -cjf $BACKUPFILE7 `find -name '*.gz'` && popd > /dev/null 2>&1
 fi
 
 # -----------------
 for file in $BACKUPFILES; do
-    chgrp backup $file
-    chmod 640    $file
+    if [ -f "$file" ]; then
+	chgrp backup $file
+	chmod 640    $file
+    fi
 done
 rm -f $BACKUPFILE5
 
