@@ -1,9 +1,9 @@
 #!/bin/sh
 
-# $Id: check.sh,v 1.2 2006-01-02 22:21:12 turbo Exp $
+# $Id: check.sh,v 1.3 2006-01-15 21:40:07 turbo Exp $
 
 TOT_ERR=0
-HOSTS="aurora localhost fritz 51pegasi"
+HOSTS="aurora fritz 51pegasi"
 for host in $HOSTS; do
     ERROR=0
     printf "Checking %10s: " $host
@@ -20,6 +20,9 @@ for host in $HOSTS; do
     ldapsearch -x -h $host -LLL -b 'o=Bayour.COM,c=SE' ou=People \* OpenLDAPaci > /dev/null 2>&1
     [ "$?" != 0 ] && ERROR=`expr $ERROR + 8`
 
+    /usr/sbin/test-smtp.pl $host
+    [ "$?" != 0 ] && ERROR=`expr $ERROR + 16`
+
     printf "=> %2d\n" $ERROR
 
     TOT_ERR=`expr $TOT_ERR + $ERROR`
@@ -28,7 +31,7 @@ done
 printf "Checking %10s: " provider
 /usr/bin/ldapsearch -LLL -x -H ldapi://%2fvar%2frun%2fslapd%2fldapi.provider \
     -b 'o=Bayour.COM,c=SE' ou=People \* OpenLDAPaci > /dev/null 2>&1
-[ "$?" != 0 ] && ERROR=`expr $ERROR + 16`
+[ "$?" != 0 ] && ERROR=`expr $ERROR + 32`
 printf "=> %2d\n" $ERROR
 
 if [ "$TOT_ERR" != 0 ]; then
@@ -38,5 +41,6 @@ if [ "$TOT_ERR" != 0 ]; then
     echo "  2: A/CNAME Aurora"
     echo "  4: MX data-akut.se"
     echo "  8: ldapsearch"
-    echo " 16: ldap provider"
+    echo " 16: smtp"
+    echo " 32: ldap provider"
 fi
