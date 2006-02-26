@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: check.sh,v 1.4 2006-02-26 09:54:51 turbo Exp $
+# $Id: check.sh,v 1.5 2006-02-26 09:57:42 turbo Exp $
 TOT_ERR=
 
 HOSTS="212.214.70.50 212.214.70.55 212.214.70.51"
@@ -62,8 +62,6 @@ for host in $HOSTS; do
     [ "$?" != 0 ] && ERROR=`expr $ERROR + $x`
     x=`expr $x \* 2`
 
-    printf "=> %2d\n" $ERROR
-
     # ---- SPAMD
     echo -n "."
     /usr/local/sbin/test-tcp.pl $host 783
@@ -71,6 +69,7 @@ for host in $HOSTS; do
     x=`expr $x \* 2`
 
     # ---- Store this error
+    printf "=> %2d\n" $ERROR
     if [ "$ERROR" != 0 ]; then
 	if [ ! -z "$TOT_ERR" ]; then
 	    TOT_ERR="$TOT_ERR $ERROR"
