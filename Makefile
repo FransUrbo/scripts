@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.43 2005-12-22 15:30:37 turbo Exp $
+# $Id: Makefile,v 1.44 2006-04-28 11:24:24 turbo Exp $
 
 sBIN		= /afs/bayour.com/common/noarch/sbin
 uBIN		= /afs/bayour.com/common/noarch/bin
@@ -35,9 +35,11 @@ install all:	clean
 	    rcp -x .TMPFILE root@$$host:/sbin/test-slapd.pl; \
 	    rm .TMPFILE; \
 	    echo; \
-	    echo -n "\`test-smtp.pl' -> \`$$host:/usr/sbin/test-smtp.pl'"; \
-	    rcp -x test-smtp.pl root@$$host:/usr/sbin/; \
-	    echo; \
+	    for test in psql slapd smtp tcp; do \
+	      echo -n "\`test-$$test.pl' -> \`$$host:/usr/local/sbin/test-$$test.pl'"; \
+	      rcp -x test-$$test.pl root@$$host:/usr/local/sbin/; \
+	      echo; \
+	    done; \
 	  done; \
 	  echo -n "\`kprop.sh' -> \`aurora:/usr/sbin/'"; \
 	  rcp -x kprop.sh root@aurora:/usr/sbin; \
