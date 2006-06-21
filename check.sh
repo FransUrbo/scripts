@@ -1,10 +1,10 @@
 #!/bin/sh
 
-# $Id: check.sh,v 1.6 2006-04-28 11:29:24 turbo Exp $
+# $Id: check.sh,v 1.7 2006-06-21 10:35:46 turbo Exp $
 TOT_ERR=
 
-HOSTS="212.214.70.50 212.214.70.55 212.214.70.51"
-#HOSTS="212.214.70.50 212.214.70.51"
+#HOSTS="212.214.70.50 212.214.70.55 212.214.70.51"
+HOSTS="212.214.70.50 212.214.70.51"
 DOMAINS="dagdrivarn.se bayour.com data-akut.se"
 
 # --------------
@@ -20,19 +20,19 @@ for host in $HOSTS; do
 	for domain in $DOMAINS; do
 	    echo -n "."
 	    host -s 5 -t ns $domain $host > /dev/null 2>&1
-	    [ "$?" != 0 ] && ERROR="ns/$domain/$host;"
+	    [ "$?" != 0 ] && ERROR="ns/$domain;"
 	done
 	
 	# ---- MX pointers
 	for domain in $DOMAINS; do
 	    echo -n "."
 	    host -s 5 -t mx $domain $host > /dev/null 2>&1
-	    [ "$?" != 0 ] && ERROR="mx/$domain/$host;"
+	    [ "$?" != 0 ] && ERROR="mx/$domain;"
 	done
 	
 	# ---- LDAP
 	echo -n "."
-	ldapsearch -l 10 -x -h $host -LLL -b 'o=Bayour.COM,c=SE' ou=People \* OpenLDAPaci > /dev/null 2>&1
+	ldapsearch -l 10 -x -h $host -LLL -b 'o=Bayour.COM,c=SE' -s one ou=People \* OpenLDAPaci > /dev/null 2>&1
 	[ "$?" != 0 ] && ERROR="ldapsearch;"
 	
 	# ---- SMTP
