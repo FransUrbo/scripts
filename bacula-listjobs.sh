@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: bacula-listjobs.sh,v 1.2 2006-06-21 10:28:39 turbo Exp $
+# $Id: bacula-listjobs.sh,v 1.3 2006-06-22 07:09:35 turbo Exp $
 
 if [ -f "/etc/bacula/.conn_details" ]; then
     . /etc/bacula/.conn_details
@@ -21,14 +21,14 @@ ORDER="ORDER BY StartTime"
 
 if [ -n "$1" ]; then
     # Get MediaId for this VolumeName
-    MEDIAID=`$COMMAND "select MediaId from Media where VolumeName='$1'" | grep -v MediaId`
+    MEDIAID=`$COMMAND "select MediaId from Media where VolumeName='$1'" | grep -v '^\*' | sed 's@.*: @@'`
     if [ -z "$MEDIAID" ]; then
 	echo "No such media!"
 	exit 1
     fi
 	
     # Get all JobId's for this Volume
-    JOBID=`$COMMAND "SELECT DISTINCT JobId FROM JobMedia WHERE MediaId=$MEDIAID ORDER BY JobId" | grep -v JobId`
+    JOBID=`$COMMAND "SELECT DISTINCT JobId FROM JobMedia WHERE MediaId=$MEDIAID ORDER BY JobId" | grep -v '^\*' | sed 's@.*: @@'`
     if [ -z "$JOBID" ]; then
 	echo "No jobs associated with this media!"
 	exit 1
