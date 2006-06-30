@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup,v 1.35 2006-04-28 11:27:28 turbo Exp $
+# $Id: backup,v 1.36 2006-06-30 10:09:56 turbo Exp $
 #
 # Backup script for host: aurora
 
@@ -17,9 +17,10 @@ BACKUPFILE4=$BACKUPDIR/MySQL/mysql-$DATE.tar.bz2
 BACKUPFILE5=/etc/dpkg/selections-$DATE.gz
 BACKUPFILE6=$BACKUPDIR/OpenAFS/afsd-$DATE.gz
 BACKUPFILE7=$BACKUPDIR/Logs/$HOSTNAME-oldlogs-$DATE.tar.bz2
+BACKUPFILE8=$BACKUPDIR/Logs/bacula-oldlogs-$DATE.tar.bz2
 BACKUPFILE9=$BACKUPDIR/PostgreSQL/postgresql-$DATE.sql.bz2
 
-BACKUPFILES="$BACKUPFILE1 $BACKUPFILE2.bz2 $BACKUPFILE3.bz2 $BACKUPFILE4 $BACKUPFILE6 $BACKUPFILE7 $BACKUPFILE9"
+BACKUPFILES="$BACKUPFILE1 $BACKUPFILE2.bz2 $BACKUPFILE3.bz2 $BACKUPFILE4 $BACKUPFILE6 $BACKUPFILE7 $BACKUPFILE8 $BACKUPFILE9"
 
 if [ ! -z "$1" ]; then
     BACKUP_TYPE=$1
@@ -137,7 +138,15 @@ tar cjpsf $BACKUPFILE1 `find etc/ldap etc/krb5* \
 # Logfiles...
 if [ "$FILES" != '' ]; then
     pushd /var/log > /dev/null 2>&1
-    tar --remove-files -cjf $BACKUPFILE7 `find -name '*.gz'`
+    tar --remove-files -cjf $BACKUPFILE7 `find -name '*.gz' | sort`
+    popd > /dev/null 2>&1
+fi
+
+# -----------------
+# Bacula logs etc
+if [ -e /var/lib/bacula ]; then
+    pushd /var/lib/bacula > /dev/null 2>&1
+    tar --remove-files -cjf $BACKUPFILE8 `find -name '*.mail*' -o -name 'log*gz' | sort`
     popd > /dev/null 2>&1
 fi
 
