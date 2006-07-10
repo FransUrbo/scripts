@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.34 2005-05-17 04:33:11 turbo Exp $
+# $Id: backup_afs.sh,v 1.35 2006-07-10 11:54:01 turbo Exp $
 
 cd /
 
@@ -45,17 +45,21 @@ get_vol_mod () {
     # Examine volume - when was volume last modified?
     local last=`vos examine $1 $LOCALAUTH | grep 'Last Update' | sed 's@.*Update @@'`
 
-    # What's that in UNIX std format (seconds since Jan 1, 1970)?
-    local modified=`date -d "$last" +"%s"`
-
-    # What's the current UNIX std time (- 24h)?
-    local now=`date +"%s"`
-    now=`expr $now - \( 60 \* 60 \* 24 \)`
-
-    if [ $modified -ge $now ]; then
+    if [ "$last" = "Never"]; then
 	return 1
     else
-	return 0
+	# What's that in UNIX std format (seconds since Jan 1, 1970)?
+	local modified=`date -d "$last" +"%s"`
+
+	# What's the current UNIX std time (- 24h)?
+	local now=`date +"%s"`
+	now=`expr $now - \( 60 \* 60 \* 24 \)`
+
+	if [ $modified -ge $now ]; then
+	    return 1
+	else
+	    return 0
+	fi
     fi
 }
 
@@ -394,7 +398,7 @@ fi
 
 # --------------
 # Get the CLI options...
-TEMP=`getopt -o heuimcdva --long help,echo,users,incr,mount,nocreate-vol,nodelete-vol,verbose,all -- "$@"`
+TEMP=`getopt -o heuimcdva --long help,echo,users,public,common,incr,mount,nocreate-vol,nodelete-vol,verbose,all -- "$@"`
 eval set -- "$TEMP"
 while true ; do
     case "$1" in
@@ -403,6 +407,8 @@ while true ; do
 	    echo "Options: -h,--help		Show this help"
 	    echo "	 -e,--echo		Don't do anything, just echo the commands"
 	    echo "	 -u,--users		Backup only the user.* volumes"
+	    echo "	 -p,--public		Backup only the public.* volumes"
+	    echo "	 -C,--common		Backup only the common.* volumes"
 	    echo "	 -i,--incr		Do a incremental backup (only changed volumes)"
 	    echo "	 -a,--all		Do a FULL backup (even volumes not changed)"
 	    echo "	 -m,--mount		Mount the volumes before doing the backup"
@@ -417,6 +423,8 @@ while true ; do
 	-d|--nodelete-vol)	DELETE_VOLUMES=0 ; shift ;;
 	-e|--echo)		action='echo' ; shift ;;
 	-u|--users)		VOLUMES=users ; shift ;;
+	-p|--public)		VOLUMES=public ; shift ;;
+	-C|--common)		VOLUMES=common ; shift ;;
 	-i|--incr)		BACKUP_TYPE=incr     ; shift ;;
 	-a|--all)		BACKUP_TYPE=all      ; shift ;;
 	-m|--mount)		MOUNT=1       ; shift ;;
@@ -442,6 +450,10 @@ fi
 # Get volumes for backup
 if [ "$VOLUMES" = "users" ]; then
     VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH | grep ^user | egrep -v '^root|readonly|\.backup|\.rescue' | sed 's@\ .*@@'`
+elif [ "$VOLUMES" = "public" ]; then
+    VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH | grep ^public | egrep -v '^root|readonly|\.backup|\.rescue' | sed 's@\ .*@@'`
+elif [ "$VOLUMES" = "common" ]; then
+    VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH | grep ^common | egrep -v '^root|readonly|\.backup|\.rescue' | sed 's@\ .*@@'`
 else
     if [ -z "$VOLUMES" ]; then
 	VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet -localauth | grep '^[a-z]' | egrep -v '^root|^bogus|readonly|\.backup' | sed -e 's@ .*@@' | sort`
