@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.35 2006-07-10 11:54:01 turbo Exp $
+# $Id: backup_afs.sh,v 1.36 2006-07-14 09:09:45 turbo Exp $
 
 cd /
 
@@ -21,7 +21,7 @@ last_modified () {
     set -- `/bin/ls -t $FILE* 2> /dev/null | sed 's@ .*@@'`
     FILE=$1
 
-    if [ ! -z "$FILE" ]; then
+    if [ -n "$FILE" ]; then
 	set -- `/bin/ls -l --full-time $FILE`
 	shift ; shift ; shift ; shift ; shift
 	mon=`echo $2 | sed -e 's@Jan@01@' -e 's@Feb@02@' -e 's@Mar@03@' -e 's@Apr@04@' \
@@ -45,7 +45,7 @@ get_vol_mod () {
     # Examine volume - when was volume last modified?
     local last=`vos examine $1 $LOCALAUTH | grep 'Last Update' | sed 's@.*Update @@'`
 
-    if [ "$last" = "Never"]; then
+    if [ "$last" = "Never" -o "$FORCE_BACKUP" = 1 ]; then
 	return 1
     else
 	# What's that in UNIX std format (seconds since Jan 1, 1970)?
@@ -97,7 +97,7 @@ get_vol_part () {
 	echo "Can't find the partition for the volume!"
 	exit 255
     else
-	[ ! -z "$action" -o ! -z "$verbose" ] && printf "%-65s" "Partition for volume $volume is $PART"
+	[ -n "$action" -o -n "$verbose" ] && printf " %-30s Partition for volume $volume is $PART\n" " "
     fi
 }
 
@@ -155,23 +155,37 @@ create_backup_volume () {
 }
 
 # --------------
+# NOTE: Don't backup if the backup file already exists!
 dump_volume () {
-    local vol="$1".backup
+    local orig=$1
+    local vol="$orig".backup
     local file="$2"
 
     if [ $SIZE -ge $MAXSIZE ]; then
 	# If the volume is bigger than 2Gb, dump in section using 'split'.
 
-	if [ ! -z "$action" ]; then
-	    RES=`$action vos dump -id $vol -server ${AFSSERVER:-localhost} \
-		-partition $PART $TIMEARG $LOCALAUTH 2> /dev/null \| split -b1024m - $file. 2>&1`
+	if [ -f $file".aa" ]; then
+	    [ -n "$verbose" ] && printf "  %-30sAlready backed up...\n" " "
+	    RES=0
+	    return 0
 	else
-	    RES=`vos dump -id $vol -server ${AFSSERVER:-localhost} \
-		-partition $PART $TIMEARG $LOCALAUTH 2> /dev/null | split -b1024m - $file. 2>&1`
+	    if [ -n "$action" ]; then
+		RES=`$action vos dump -id $vol -server ${AFSSERVER:-localhost} \
+		    -partition $PART $TIMEARG $LOCALAUTH 2> /dev/null \| split -b1024m - $file. 2>&1`
+	    else
+		RES=`vos dump -id $vol -server ${AFSSERVER:-localhost} \
+		    -partition $PART $TIMEARG $LOCALAUTH 2> /dev/null | split -b1024m - $file. 2>&1`
+	    fi
 	fi
     else
-	RES=`$action vos dump -id $vol -server ${AFSSERVER:-localhost} \
-	    -partition $PART $TIMEARG -file $file $LOCALAUTH 2>&1`
+	if [ -f $file ]; then
+	    [ -n "$verbose" ] && printf "  %-30sAlready backed up...\n" " "
+	    RES=0
+	    return 0
+	else
+	    RES=`$action vos dump -id $vol -server ${AFSSERVER:-localhost} \
+		-partition $PART $TIMEARG -file $file $LOCALAUTH 2>&1`
+	fi
     fi
 }
 
@@ -182,20 +196,13 @@ do_backup () {
     local TIMEARG
     local ERROR
 
+    [ -n "$verbose" ] && echo "Backing up volumes:"
     for volume in $VOLUMES; do
 	if ! get_vol_mod $volume; then
 	    # Backup the volume, it have been modified with the last 24 hours
+	    printf "  %-30sstart = `date +"%Y%m%d %H:%M:%S"`\n" $volume
+	    START=`date +"%s"`
 
-	    [ ! -z "$verbose" ] && echo "Backing up volume:"
-
-	    echo "  $volume: start = " `date +"%Y%m%d %H:%M:%S"` ; START=`date +"%s"`
-
-	    if [ ! -z "$action" ]; then
-		printf "%s\n" $volume
-	    else
-		[ ! -z "$verbose" ] && printf "  %-25s" $volume
-	    fi
-	    
 	    # Find the 'mountpoint' of the volume
 	    [ "$MOUNT" -gt 0 ] && get_vol_mnt $volume
 	    
@@ -313,9 +320,9 @@ do_backup () {
 			BACKUPFILE="$BACKUPDIR/incr-$volume-$CURRENTDATE"
 			last_modified "$BACKUPDIR/incr-$volume-"
 			
-			if [ ! -z "$DATE" ]; then
-			    if [ ! -z "$verbose" ]; then
-				echo "dump > '$DATE'"
+			if [ -n "$DATE" ]; then
+			    if [ -n "$verbose" ]; then
+				printf " %-30s dump > '$DATE'\n" " "
 			    fi
 			    TIMEARG="-time $DATE"
 			else
@@ -326,7 +333,7 @@ do_backup () {
 		    fi
 		    
 		    dump_volume $volume $BACKUPFILE
-		    if [ -z "$?" ]; then
+		    if [ "$?" != 0 ]; then
 			ERROR=2
 		    fi
 		    
@@ -334,7 +341,7 @@ do_backup () {
 			# DUMP FAILED - any reason
 		
 			RES=`echo $RES | sed 's@.* /@/@'`
-			[ ! -z "$verbose" ] && echo "$RES"
+			[ -n "$verbose" ] && printf " %-30s %s\n" " " $RES
 		    fi
 		    
 		    # ------------------
@@ -366,22 +373,27 @@ do_backup () {
 			fi
 		    fi
 		fi
-		
-		[ ! -z "$action" -o ! -z "$verbose" ] && echo '-----'
 	    fi
 
-	    echo "  $volume: end   = " `date +"%Y%m%d %H:%M:%S"` ; END=`date +"%s"`
+	    END=`date +"%s"`
+	    printf "  %-30send   = `date +"%Y%m%d %H:%M:%S"`\n" " "
+
 	    SEC=`expr $END - $START` ; MIN=`expr $SEC / 60`
-	    echo "  $volume: took  = $SEC sec (~$MIN min)"
+	    printf "  %-30stook  = $SEC sec (~$MIN min)\n" " "
 	    echo
 	fi
     done
 }
 
+do_echo () {
+    local string="`echo $*`"
+    printf " %-30s CMD: '%s'\n" " " "$string"
+}
+
 # =================================================================
 
 # Don't change this
-MOUNT=0 ; BACKUP_VOLUMES=1 ; DELETE_VOLUMES=1
+MOUNT=0 ; BACKUP_VOLUMES=1 ; DELETE_VOLUMES=1 ; FORCE_BACKUP=0
 
 # --------------
 # Do we backup odd or even weeks?
@@ -398,39 +410,52 @@ fi
 
 # --------------
 # Get the CLI options...
-TEMP=`getopt -o heuimcdva --long help,echo,users,public,common,incr,mount,nocreate-vol,nodelete-vol,verbose,all -- "$@"`
+TEMP=`getopt -o Cacdefhimpuv --long all,common,echo,force,help,incr,mount,nocreate-vol,nodelete-vol,public,users,verbose -- "$@"`
 eval set -- "$TEMP"
 while true ; do
     case "$1" in
+	-C|--common)		VOLUMES=common		; shift ;;
+	-a|--all)		BACKUP_TYPE=all		; shift ;;
+	-c|--nocreate-vol)	BACKUP_VOLUMES=0	; shift ;;
+	-d|--nodelete-vol)	DELETE_VOLUMES=0	; shift ;;
+	-e|--echo)		action=do_echo		; shift ;;
+	-f|--force)		FORCE_BACKUP=1		; shift ;;
 	-h|--help)
 	    echo "Usage:   `basename $0` [option] [volume]"
-	    echo "Options: -h,--help		Show this help"
-	    echo "	 -e,--echo		Don't do anything, just echo the commands"
-	    echo "	 -u,--users		Backup only the user.* volumes"
-	    echo "	 -p,--public		Backup only the public.* volumes"
+	    echo "Options:"
 	    echo "	 -C,--common		Backup only the common.* volumes"
-	    echo "	 -i,--incr		Do a incremental backup (only changed volumes)"
 	    echo "	 -a,--all		Do a FULL backup (even volumes not changed)"
-	    echo "	 -m,--mount		Mount the volumes before doing the backup"
 	    echo "	 -c,--nocreate-vol	Don't create the backup volume(s) before backup"
 	    echo "	 -d,--nodelete-vol	Don't delete the backup volume(s) after backup"
+	    echo "	 -e,--echo		Don't do anything, just echo the commands"
+	    echo "       -f,--force		Force backup of all specified volumes (ignore last access)"
+	    echo "       -h,--help		Show this help"
+	    echo "	 -i,--incr		Do a incremental backup (only changed volumes)"
+	    echo "	 -m,--mount		Mount the volumes before doing the backup"
+	    echo "	 -p,--public		Backup only the public.* volumes"
+	    echo "	 -u,--users		Backup only the user.* volumes"
 	    echo "	 -v,--verbose		Explain what's to be done"
 	    echo "If volume is given, only backup that/those volumes."
 	    echo 
 	    exit 0
 	    ;;
-	-c|--nocreate-vol)	BACKUP_VOLUMES=0 ; shift ;;
-	-d|--nodelete-vol)	DELETE_VOLUMES=0 ; shift ;;
-	-e|--echo)		action='echo' ; shift ;;
-	-u|--users)		VOLUMES=users ; shift ;;
-	-p|--public)		VOLUMES=public ; shift ;;
-	-C|--common)		VOLUMES=common ; shift ;;
-	-i|--incr)		BACKUP_TYPE=incr     ; shift ;;
-	-a|--all)		BACKUP_TYPE=all      ; shift ;;
-	-m|--mount)		MOUNT=1       ; shift ;;
-	-v|--verbose)		verbose=1     ; shift ;;
-	--)			shift ; VOLUMES="$*" ; break ;; 
-	*)			echo "Internal error!" ; exit 1 ;;
+	-i|--incr)		BACKUP_TYPE=incr	; shift ;;
+	-m|--mount)		MOUNT=1			; shift ;;
+	-p|--public)		VOLUMES=public		; shift ;;
+	-u|--users)		VOLUMES=users		; shift ;;
+	-v|--verbose)		verbose=1		; shift ;;
+	--)
+	    shift
+	    if [ -n "$1" ]; then
+		if [ -n "$VOLUMES" ]; then
+		    EXTRA_VOLUMES="$*"
+		else
+		    $VOLUMES="$*"
+		fi
+	    fi
+	    break
+	    ;; 
+	*)			echo "Internal error!"	; exit 1 ;;
     esac
 done
 
@@ -448,22 +473,22 @@ fi
 
 # --------------
 # Get volumes for backup
-if [ "$VOLUMES" = "users" ]; then
+if echo "$VOLUMES" | grep -q ^users; then
     VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH | grep ^user | egrep -v '^root|readonly|\.backup|\.rescue' | sed 's@\ .*@@'`
-elif [ "$VOLUMES" = "public" ]; then
+elif echo "$VOLUMES" | grep -q ^public; then
     VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH | grep ^public | egrep -v '^root|readonly|\.backup|\.rescue' | sed 's@\ .*@@'`
-elif [ "$VOLUMES" = "common" ]; then
+elif echo "$VOLUMES" | grep -q ^common; then
     VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet $LOCALAUTH | grep ^common | egrep -v '^root|readonly|\.backup|\.rescue' | sed 's@\ .*@@'`
 else
     if [ -z "$VOLUMES" ]; then
 	VOLUMES=`vos listvol ${AFSSERVER:-localhost} -quiet -localauth | grep '^[a-z]' | egrep -v '^root|^bogus|readonly|\.backup' | sed -e 's@ .*@@' | sort`
     fi
 fi
-VOLUMES=`echo $VOLUMES`
+VOLUMES=`echo $VOLUMES $EXTRA_VOLUMES`
 
 do_backup
 
-if [ ! -z "$MISSING_VOLUMES" ]; then
+if [ -n "$MISSING_VOLUMES" ]; then
     echo "ERROR: Did not backup the volumes: $MISSING_VOLUMES." > /dev/stderr
 
     # Sleep for five minutes before trying again...
