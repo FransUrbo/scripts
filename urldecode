@@ -1,0 +1,8 @@
+#!/usr/bin/php4
+<?php
+if($argc > 1) {
+  echo urldecode($argv[1])."\n";
+} else {
+  echo "Usage: ".$argv[0]." <string>\n";
+}
+?>
