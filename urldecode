@@ -1,8 +1,23 @@
 #!/usr/bin/php4
 <?php
 if($argc > 1) {
-  echo urldecode($argv[1])."\n";
+  $string = '';
+  for($i=1; $argv[$i]; $i++) {
+	$string .= $argv[$i];
+	if($argv[$i+1])
+	  $string .= ' ';
+  }
+
+  echo urldecode($string)."\n";
 } else {
   echo "Usage: ".$argv[0]." <string>\n";
 }
+
+/*
+ * Local variables:
+ * mode: php
+ * mode: font-lock
+ * tab-width: 4
+ * End:
+ */
 ?>
