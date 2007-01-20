@@ -1,5 +1,7 @@
 #!/usr/bin/perl -w
 
+use MIME::Base64;
+
 # Load the whole LDIF
 $count = 0;
 while(! eof(STDIN)) {
@@ -33,6 +35,11 @@ for($i=0; $i < $count; $i++) {
 
 	if($first) {
 	    print "\n" if(($line =~ /^dn: /) || ($line =~ /^dn:: /));
+	}
+
+	if($line =~ /^dn:: /) {
+	    $dn = (split('dn:: ', $line))[1];
+	    print "# dn: ".decode_base64("$dn")."\n";
 	}
 	print "$line\n";
 	$first = 1;
