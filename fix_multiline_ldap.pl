@@ -32,7 +32,7 @@ for($i=0; $i < $count; $i++) {
 	}
 
 	if($first) {
-	    print "\n" if($line =~ /^dn: /);
+	    print "\n" if(($line =~ /^dn: /) || ($line =~ /^dn:: /));
 	}
 	print "$line\n";
 	$first = 1;
