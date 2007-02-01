@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: backup_afs.sh,v 1.36 2006-07-14 09:09:45 turbo Exp $
+# $Id: backup_afs.sh,v 1.37 2007-02-01 15:42:10 turbo Exp $
 
 cd /
 
@@ -142,12 +142,22 @@ create_backup_volume () {
     else
 	if [ -z "$action" ]; then
 	    if [ "$BACKUP_VOLUMES" -gt 0 ]; then
+		[ -n "$verbose" ] && printf "  %-30sCreating backup volume...\n" " "
 		RES=`vos backup $volume $LOCALAUTH 2>&1`
 	    else
-		$action vos backup $volume $LOCALAUTH
-		RES="Created backup volume for $volume"
+		# Make sure that the backup volume actually exists!
+		if ! vos examine $vol\.backup > /dev/null 2>&1; then
+		    printf "  %-30sForcing creation of backup volume (doesn't exist!)\n" " "
+		    RES=`vos backup $volume $LOCALAUTH 2>&1`
+		else
+		    # Fake this so that the rest of the code understands
+		    # See call to create_backup_volume() in do_backup()
+		    [ -n "$verbose" ] && printf "  %-30sSkipping creating of backup volume as requested...\n" " "
+		    RES="Created backup volume for $volume"
+		fi
 	    fi
 	else
+	    [ -n "$verbose" ] && printf "  %-30sCreating backup volume...\n" " "
 	    $action vos backup $volume $LOCALAUTH
 	    RES="Created backup volume for $volume"
 	fi
@@ -155,7 +165,8 @@ create_backup_volume () {
 }
 
 # --------------
-# NOTE: Don't backup if the backup file already exists!
+# NOTE:  Don't backup if the backup file already exists!
+# NOTE2: Ehm... Yes we should. If --force is given, then overwrite file(s)!
 dump_volume () {
     local orig=$1
     local vol="$orig".backup
@@ -164,7 +175,7 @@ dump_volume () {
     if [ $SIZE -ge $MAXSIZE ]; then
 	# If the volume is bigger than 2Gb, dump in section using 'split'.
 
-	if [ -f $file".aa" ]; then
+	if [ -f $file".aa" -a "$FORCE_BACKUP" -lt 1 ]; then
 	    [ -n "$verbose" ] && printf "  %-30sAlready backed up...\n" " "
 	    RES=0
 	    return 0
@@ -178,7 +189,7 @@ dump_volume () {
 	    fi
 	fi
     else
-	if [ -f $file ]; then
+	if [ -f $file -a "$FORCE_BACKUP" -lt 1 ]; then
 	    [ -n "$verbose" ] && printf "  %-30sAlready backed up...\n" " "
 	    RES=0
 	    return 0
@@ -362,14 +373,14 @@ do_backup () {
 			if [ "$DELETE_VOLUMES" -gt 0 ]; then
 			    # Remove the backup volume
 			    if [ -z "$action" ]; then
-				if [ "$BACKUP_VOLUMES" -gt 0 ]; then
-				    vos remove -id $volume.backup $LOCALAUTH > /dev/null 2>&1 &
-				else
-				    $action vos remove -id $volume.backup $LOCALAUTH
-				fi
+				[ -n "$verbose" ] && printf "  %-30sRemoving backup volume...\n" " "
+				vos remove -id $volume.backup $LOCALAUTH > /dev/null 2>&1 &
 			    else
 				$action vos remove -id $volume.backup $LOCALAUTH
 			    fi
+			elif [ -n "$verbose" ]; then
+			    # Just for verbose purposes...
+			    printf "  %-30sSkipping removal of backup volume as requested...\n" " "
 			fi
 		    fi
 		fi
@@ -428,8 +439,8 @@ while true ; do
 	    echo "	 -c,--nocreate-vol	Don't create the backup volume(s) before backup"
 	    echo "	 -d,--nodelete-vol	Don't delete the backup volume(s) after backup"
 	    echo "	 -e,--echo		Don't do anything, just echo the commands"
-	    echo "       -f,--force		Force backup of all specified volumes (ignore last access)"
-	    echo "       -h,--help		Show this help"
+	    echo "	 -f,--force		Force backup of all specified volumes (ignore last access)"
+	    echo "	 -h,--help		Show this help"
 	    echo "	 -i,--incr		Do a incremental backup (only changed volumes)"
 	    echo "	 -m,--mount		Mount the volumes before doing the backup"
 	    echo "	 -p,--public		Backup only the public.* volumes"
@@ -450,7 +461,7 @@ while true ; do
 		if [ -n "$VOLUMES" ]; then
 		    EXTRA_VOLUMES="$*"
 		else
-		    $VOLUMES="$*"
+		    VOLUMES="$*"
 		fi
 	    fi
 	    break
