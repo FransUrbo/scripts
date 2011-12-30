@@ -2,9 +2,8 @@
 
 sensors | egrep ' Fan| Temp' ; echo
 
-for dev in hda hdb hdc hdd /dev/sd?; do
-    dev=`echo "$dev" | sed 's@/dev/@@'`
-    smartctl -d ata -a /dev/$dev 2>&1 | grep Temperature_Celsius | \
+for dev in /dev/hd? /dev/sd?; do
+    smartctl -d ata -a $dev 2>&1 | grep Temperature_Celsius | \
         while read line; do
             # 194 Temperature_Celsius     0x0022   048   054   000    Old_age   Always       -       48 (Lifetime Min/Max 0/23)
             # 194 Temperature_Celsius     0x0022   034   055   000    Old_age   Always       -       34 (0 23 0 0)
