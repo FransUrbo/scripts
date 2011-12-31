@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w                                                                                                                  
 
-$FREQ_MIN = 3300;
+$FREQ_MIN = 3700;
 $FREQ_MAX = 4800;
 
 $BASE_START = 100;
