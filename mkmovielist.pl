@@ -1,6 +1,8 @@
 #!/usr/bin/perl -w
 
 $ZFS_SHARE = "share/Movies";
+$ZFS_SHARE_ADDITIONAL = "share/TV_Series";
+$TV_SERIES_MATCH = 'TV_Series';
 
 # --------------------------------------------
 # 0: file	/share/Movies/Action/Lord Of The Rings/Lord Of The Rings 1 - Fellowship of The Ring - CD1.avi
@@ -12,6 +14,8 @@ $ZFS_SHARE = "share/Movies";
 # 6: casts	Elijah Wood, Ian McKellen, Orlando Bloom
 # 7: directors	Peter Jackson
 # 8: plot	An innocent hobbit of The Shire journeys with eight companions to the<br>fires of Mount Doom to destroy the One Ring and the dark lord Sauron<br>forever.<br>
+
+%CASTS = (); %GENRES = (); %YEARS = (); %DIRECTORS = ();
 
 # --------------------------------------------
 sub update_list() {
@@ -41,8 +45,8 @@ sub update_list() {
 sub translate_string() {
     my($string) = @_;
 
-    $string =~ s/\&eacute/e/i;
-    $string =~ s/\&aacute/a/i;
+    $string =~ s/\&eacute;/e/i;
+    $string =~ s/\&aacute;/a/i;
     $string =~ s/\&iacute;/i/i;
     $string =~ s/\&oacute;/o/i;
     $string =~ s/\&ntilde;/n/i;
@@ -63,7 +67,7 @@ sub translate_string() {
 # --------------------------------------------
 sub imdb_lookup() {
     my($title, $cnt) = @_;
-    my($line, $data, $year, $genres, $casts, $directors, $plot, $url);
+    my($line, $imdb_title, $data, $year, $genres, $casts, $directors, $plot, $url);
 
     $cnt = 0 if(!$cnt);
     return '' if($cnt >= 2);
@@ -80,7 +84,9 @@ sub imdb_lookup() {
 	$data =~ s/.* : //;
 	$data = &translate_string($data);
 
-	if($line =~ /^Year .*:/) {
+	if($line =~ /^Title .*:/) {
+	    $imdb_title = $data;
+	} elsif($line =~ /^Year .*:/) {
 	    if($title =~ /^[0-9][0-9][0-9][0-9] /) {
 		# Special case - bug in imdb-mf: Actual year is on next line
 		$line = <IMDB>;
@@ -140,10 +146,12 @@ sub imdb_lookup() {
     close(IMDB);
 
     if($url !~ /^http:/) {
+	# Try again, with slightly modified title...
 	$title =~ s/.*\ -\ //;
-	($year, $genres, $casts, $directors, $url, $plot) = &imdb_lookup($title, $cnt+1);
+	($imdb_title, $year, $genres, $casts, $directors, $url, $plot) = &imdb_lookup($title, $cnt+1);
     }
 
+    # Just so we don't return NULL
     $url       = '' if(!$url);
     $year      = '' if(!$year);
     $genres    = '' if(!$genres);
@@ -151,7 +159,17 @@ sub imdb_lookup() {
     $directors = '' if(!$directors);
     $plot      = '' if(!$plot);
 
-    return(($year, $genres, $casts, $directors, $url, $plot));
+#    if($url) {
+#	if($imdb_title =~ /$title/) {
+	    return(($imdb_title, $year, $genres, $casts, $directors, $url, $plot));
+#	} else {
+#	    # Oups, wrong one!
+#	    print STDERR "WRONG";
+#	    return((0, 0, 0, 0, 0, 0, 0));
+#	}
+#    } else {
+#	return((0, 0, 0, 0, 0, 0, 0));
+#    }
 }
 
 # --------------------------------------------
@@ -164,20 +182,31 @@ if(open(LIST, ".mkmovielist.list")) {
 	$MOVIES{"$name"} = $line;
     }
     close(LIST);
-#} else {
-#    %MOVIES = {};
+} else {
+    %MOVIES = ();
 }
 
 # --------------------------------------------
 $movie_nr = 1;
 
-open(FS, "zfs list -H -r \"$ZFS_SHARE\" -o mountpoint | sort | ")
+open(FS, "zfs list -H -r '$ZFS_SHARE' '$ZFS_SHARE_ADDITIONAL' -o mountpoint 2> /dev/null | sort | ")
     || die("Can't open ZFS shares list, $!\n");
 while(! eof(FS)) {
     my $fs = <FS>;
     chomp($fs);
 
-    open(FIND, "find \"$fs\" -maxdepth 1 -type f | ")
+    if($fs =~ /Movies/) {
+	$type = 'f';
+	$wild = '';
+    } elsif($fs =~ /$TV_SERIES_MATCH/) {
+	$type = 'd';
+	$wild = '/*';
+    } else {
+	print "ERROR: Don't know how to find. Check the code!\n";
+	exit(1);
+    }
+
+    open(FIND, "find \"$fs\"$wild -maxdepth 1 -type $type | ")
 	|| die("Can't run find, $!\n");
     while(! eof(FIND)) {
 	my $file = <FIND>;
@@ -204,7 +233,8 @@ while(! eof(FS)) {
 		($file =~ /lrc-natm\.r5/) ||
 		($file =~ /Store/) ||
 		($file =~ /cnid2/) ||
-		($file =~ /__db/) ||
+		($file =~ /^_.*/) ||
+		($file =~ /\.Apple/) ||
 		($file =~ /Parent/) ||
 		($file =~ /volinfo/) ||
 		($file =~ /VTS/) ||
@@ -235,46 +265,49 @@ while(! eof(FS)) {
 
 	printf(STDERR "%4d: $file -> $name: ", $movie_nr);
 
-	my $DO_IMDB = 1; my $existing_url = ""; my $UPDATE_LIST = 0;
+	my($DO_IMDB, $UPDATE_LIST) = (0, 0);
 	if($MOVIES{"$name"}) {
 	    ($dummy, $dummy, $dummy, $url, $year, $genres, $casts, $directors, $plot) =
 		split(';', $MOVIES{"$name"});
 
-	    $DO_IMDB = 0 if($url);
-
 	    # Re-read from IMDB. Might be missing something (added value in file/script?)
 	    if(!$year || !$genres || !$casts || !$directors || !$plot) {
+		# We're missing a value - force a new IMDB search for this title.
 		$DO_IMDB = 1;
+
 #		$UPDATE_LIST = 1;
 #		undef($MOVIES{"$name"});
+	    } else {
+		# We have what we need - no point in doing a IMDB search.
+		$DO_IMDB = 0;
 	    }
 	}
 
 	if($DO_IMDB) {
-	    ($year, $genres, $casts, $directors, $url, $plot) = &imdb_lookup($title);
+	    ($dummy, $year, $genres, $casts, $directors, $url, $plot) = &imdb_lookup($title);
+	    $genres = "TV Series, $genres" if($genres && ($file =~ /$TV_SERIES_MATCH/) && ($genres !~ /^TV Series/));
 
-	    if($url && !$MOVIES{"$name"}) {
-		if($UPDATE_LIST) {
-		    print STDERR "FOUND:UPDATE";
-		    &update_list("$file;$name;$title;$url;$year;$genres;$casts;$directors;$plot");
+	    if($url) {
+		if(!$MOVIES{"$name"}) {
+		    if($UPDATE_LIST) {
+			print STDERR "FOUND:UPDATE";
+			&update_list("$file;$name;$title;$url;$year;$genres;$casts;$directors;$plot");
+		    } else {
+			print STDERR "FOUND:NEW";
+
+			open(LIST, ">> .mkmovielist.list")
+			    || die("Can't append to existing list of movies, $!\n");
+			print LIST "$file;$name;$title;$url;$year;$genres;$casts;$directors;$plot\n";
+			close(LIST);
+		    }
 		} else {
-		    print STDERR "FOUND:NEW";
-
-		    open(LIST, ">> .mkmovielist.list")
-			|| die("Can't append to existing list of movies, $!\n");
-		    print LIST "$file;$name;$title;$url;$year;$genres;$casts;$directors;$plot\n";
-		    close(LIST);
+		    print STDERR "FOUND:MISSING";
 		}
 	    }
 	} else {
 	    print STDERR "EXISTING";
+	    $genres = "TV Series, $genres" if($genres && ($file =~ /$TV_SERIES_MATCH/) && ($genres !~ /^TV Series/));
 	}
-
-	$year      = '' if(!$year);
-	$genres    = '' if(!$genres);
-	$casts     = '' if(!$casts);
-	$directors = '' if(!$directors);
-	$plot      = '' if(!$plot);
 
 	$ENTRIES{"$name"} = "$file;$name;$title;$url;$year;$genres;$casts;$directors;$plot";
 
@@ -326,12 +359,6 @@ for my $entry (sort keys %ENTRIES) {
 
     $name      =~ s/^The (.*)/$1, The/;
     $name      = &translate_string($name);
-
-    $year      = '' if(!$year);
-    $genres    = '' if(!$genres);
-    $casts     = '' if(!$casts);
-    $directors = '' if(!$genres);
-    $url       = '' if(!$url);
 
     if(!$plot) {
 	$plot  = '';
