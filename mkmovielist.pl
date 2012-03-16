@@ -1,5 +1,7 @@
 #!/usr/bin/perl -w
 
+$ZFS_SHARE = "share/Movies";
+
 # --------------------------------------------
 # 0: file	/share/Movies/Action/Lord Of The Rings/Lord Of The Rings 1 - Fellowship of The Ring - CD1.avi
 # 1: name	Lord Of The Rings 1 - Fellowship of The Ring
@@ -169,7 +171,7 @@ if(open(LIST, ".mkmovielist.list")) {
 # --------------------------------------------
 $movie_nr = 1;
 
-open(FS, "zfs list -H -r share/Movies -o mountpoint | sort | ")
+open(FS, "zfs list -H -r \"$ZFS_SHARE\" -o mountpoint | sort | ")
     || die("Can't open ZFS shares list, $!\n");
 while(! eof(FS)) {
     my $fs = <FS>;
@@ -291,10 +293,10 @@ while(! eof(FS)) {
 close(FS);
 
 # --------------------------------------------
-open(HTML, "> /share/Movies.html")
+open(HTML, "> /$ZFS_SHARE.html")
     || die("Can't open output html file, $!\n");
 
-open(TEXT, "> /share/Movies.txt")
+open(TEXT, "> /$ZFS_SHARE.txt")
     || die("Can't open output text file, $!\n");
 
 print HTML "<html>
