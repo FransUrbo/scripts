@@ -237,6 +237,8 @@ while(! eof(FS)) {
 		($file =~ /\.Apple/) ||
 		($file =~ /Parent/) ||
 		($file =~ /volinfo/) ||
+		($file =~ /Subtitles/) ||
+		($file =~ /Extras/) ||
 		($file =~ /VTS/) ||
 		($file =~ /Pixar Short Films Collection/) ||
 		($file =~ /Walt Disney\'s Fables/));
@@ -258,21 +260,37 @@ while(! eof(FS)) {
 
 	# --------------------------------------------
 	my $title = $name;
-	$title =~ s/ \(.*\)//;
+	$title =~ s/ \(Cam\)//i;
+	$title =~ s/ \(ISO\)//i;
+	$title =~ s/ \(TS\)//i;
+	$title =~ s/ \(R[0-9]\)//i;
+	$title =~ s/ \(SweSub\)//i;
+	$title =~ s/ \(Scr\)//i;
+	$title =~ s/ \(DVDScr\)//i;
+	$title =~ s/ \(DVDRip\)//i;
+	$title =~ s/ \(MultiSubs\)//i;
+	$title =~ s/ \(PAL\)//i;
+	$title =~ s/ \(Bonus Disc\)//i;
+	$title =~ s/ \(Extended\)//i;
+	$title =~ s/ \(SvensktTal\)//i;
+	$title =~ s/ \(MultiSubs-PAL\)//i;
+	$title =~ s/ \(Unrated\)//i;
+
 	$title =~ s/Disney\'s //;
-	$title =~ s/ [12][90][0-9][0-9]//;
+	$title =~ s/ ([12][90][0-9][0-9])/ \($1\)/;
 	$title =~ s/\ -$//;
 
 	printf(STDERR "%4d: $file -> $name: ", $movie_nr);
 
-	my($DO_IMDB, $UPDATE_LIST) = (0, 0);
+	my($DO_IMDB, $UPDATE_LIST) = (1, 0);
 	if($MOVIES{"$name"}) {
 	    ($dummy, $dummy, $dummy, $url, $year, $genres, $casts, $directors, $plot) =
 		split(';', $MOVIES{"$name"});
 
 	    # Re-read from IMDB. Might be missing something (added value in file/script?)
-	    if(!$year || !$genres || !$casts || !$directors || !$plot) {
+	    if(!$url) {
 		# We're missing a value - force a new IMDB search for this title.
+		# NOTE: We really only care about the URL!
 		$DO_IMDB = 1;
 
 #		$UPDATE_LIST = 1;
@@ -332,6 +350,10 @@ open(HTML, "> /$ZFS_SHARE.html")
 open(TEXT, "> /$ZFS_SHARE.txt")
     || die("Can't open output text file, $!\n");
 
+$ENV{'LANG'} = "C";
+$cur_date = `date`;
+chomp($cur_date);
+
 print HTML "<html>
   <head>
     <title>The Movie Data Base</title>
@@ -342,6 +364,8 @@ print HTML "<html>
   </head>
 
   <body>
+    <h1>Number of entries: ".keys(%ENTRIES)."</h1>
+    <font size=\"2\">Last updated: <i>$cur_date</i></font>
     <table border=\"1\">
       <tr>
         <th align=\"left\"><u><font size=\"5\" color=\"red\">Title/URL</font></u></th>
