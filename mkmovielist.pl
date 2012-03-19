@@ -72,7 +72,7 @@ sub imdb_lookup() {
     $cnt = 0 if(!$cnt);
     return '' if($cnt >= 2);
 
-    print STDERR "lookup {$title} ";
+    print "lookup {$title} ";
 
     open(IMDB, "/usr/local/bin/imdb-mf -t \"$title\" |")
 	|| die("Can't fetch from IMDB, $!\n");
@@ -81,7 +81,8 @@ sub imdb_lookup() {
 	chomp($line);
 
 	$data =  $line;
-	$data =~ s/.* : //;
+	$data =~ s/.* ://;
+	$data =~ s/^ //;
 	$data = &translate_string($data);
 
 	if($line =~ /^Title .*:/) {
@@ -141,6 +142,7 @@ sub imdb_lookup() {
 	    $plot = $data;
 	} elsif($line =~ /^IMDB movie URL/) {
 	    $url =  $data;
+	    last;
 	}
     }
     close(IMDB);
@@ -159,12 +161,14 @@ sub imdb_lookup() {
     $directors = '' if(!$directors);
     $plot      = '' if(!$plot);
 
+    $plot = "$imdb_title: $plot" if($imdb_title && $plot);
+
 #    if($url) {
 #	if($imdb_title =~ /$title/) {
 	    return(($imdb_title, $year, $genres, $casts, $directors, $url, $plot));
 #	} else {
 #	    # Oups, wrong one!
-#	    print STDERR "WRONG";
+#	    print "WRONG";
 #	    return((0, 0, 0, 0, 0, 0, 0));
 #	}
 #    } else {
@@ -280,7 +284,7 @@ while(! eof(FS)) {
 	$title =~ s/ ([12][90][0-9][0-9])/ \($1\)/;
 	$title =~ s/\ -$//;
 
-	printf(STDERR "%4d: $file -> $name: ", $movie_nr);
+	printf("%4d: $file -> $name: ", $movie_nr);
 
 	my($DO_IMDB, $UPDATE_LIST) = (1, 0);
 	if($MOVIES{"$name"}) {
@@ -308,10 +312,10 @@ while(! eof(FS)) {
 	    if($url) {
 		if(!$MOVIES{"$name"}) {
 		    if($UPDATE_LIST) {
-			print STDERR "FOUND:UPDATE";
+			print "FOUND:UPDATE";
 			&update_list("$file;$name;$title;$url;$year;$genres;$casts;$directors;$plot");
 		    } else {
-			print STDERR "FOUND:NEW";
+			print "FOUND:NEW";
 
 			open(LIST, ">> .mkmovielist.list")
 			    || die("Can't append to existing list of movies, $!\n");
@@ -319,11 +323,11 @@ while(! eof(FS)) {
 			close(LIST);
 		    }
 		} else {
-		    print STDERR "FOUND:MISSING";
+		    print "FOUND:MISSING";
 		}
 	    }
 	} else {
-	    print STDERR "EXISTING";
+	    print "EXISTING";
 	    $genres = "TV Series, $genres" if($genres && ($file =~ /$TV_SERIES_MATCH/) && ($genres !~ /^TV Series/));
 	}
 
@@ -332,10 +336,10 @@ while(! eof(FS)) {
 	if($url) {
 	    $ENTRIES{"$name"} .= ";$url";
 	} else {
-	    print STDERR "NOT FOUND";
+	    print "NOT FOUND";
 	}
 
-	print STDERR "\n";
+	print "\n";
 
 	$movie_nr++;
     }
