@@ -9,7 +9,7 @@ if type zpool > /dev/null 2>&1; then
     zpool status > $ZFS_TEMP 2> /dev/null
 fi
 
-printf "  %-7s %-4s %-20s%-45s%-10s%-10s%-10s%-10s\n\n" "Host" "Name" "Model" "Device by ID" "Rev" "MD" "VG" "ZFS"
+printf "  %-7s %-4s %-20s%-45s%-10s%-10s%-10s%-20s%-8s\n\n" "Host" "Name" "Model" "Device by ID" "Rev" "MD" "VG" "ZFS" "Size"
 
 lspci -D | \
     egrep 'SATA|SCSI|IDE|RAID' | \
@@ -80,6 +80,7 @@ lspci -D | \
 					name="n/a"
 				    fi
 				fi
+                                dev=`find /dev -name "$name" -type b`
 
 				# ... model
 				model=`cat "$path/model"`
@@ -162,11 +163,25 @@ lspci -D | \
 
 				    [ -z "$md" ] && md="n/a"
                                     [ -z "$vg" ] && vg="n/a"
+
+				    # ----------------------
+                                    # Get size of disk
+                                    if type fdisk > /dev/null 2>&1; then
+                                        size=`fdisk -l $dev 2> /dev/null | \
+						grep '^Disk /' | \
+						sed -e "s@.*: \(.*\), .*@\1@" \
+						    -e 's@\.[0-9] @@'`
+                                        if echo "$size" | egrep -q '^[0-9][0-9][0-9][0-9]GB'; then
+                                            s=`echo "$size" | sed 's@GB@@'`
+                                            size=`echo "scale=2; $s / 1024" | bc`"TB"
+                                        fi
+                                    fi
+                                    [ -z "$size" ] && size="n/a"
 				fi
 
 				# ----------------------
 				# Output information
-				printf "  %-7s %-4s %-20s%-45s%-10s%-10s%-10s%-10s\n" $host $name "$model" "$DID" $rev $md $vg "$zfs"
+				printf "  %-7s %-4s %-20s%-45s%-10s%-10s%-10s%-20s%8s\n" $host $name "$model" "$DID" $rev $md $vg "$zfs" "$size"
 			    done # => 'while read block; do'
 		    else
 			printf "  %-7s n/a\n" $host
