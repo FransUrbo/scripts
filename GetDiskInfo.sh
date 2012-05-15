@@ -149,7 +149,6 @@ lspci -D | \
 
 				    # ----------------------
 				    # Get LVM data (VG - Virtual Group) for this disk
-				    md="n/a" ; vg="n/a"
 				    lvm_regexp="/$name"
 				    [ -n "$md" ] && lvm_regexp="$lvm_regexp|$md"
 				    if type pvs > /dev/null 2>&1; then
@@ -160,6 +159,9 @@ lspci -D | \
 						fi
 					    done)
 				    fi
+
+				    [ -z "$md" ] && md="n/a"
+                                    [ -z "$vg" ] && vg="n/a"
 				fi
 
 				# ----------------------
