@@ -80,7 +80,7 @@ lspci -D | \
 					name="n/a"
 				    fi
 				fi
-                                dev=`find /dev -name "$name" -type b`
+                                dev_path=`find /dev -name "$name" -type b`
 
 				# ... model
 				model=`cat "$path/model"`
@@ -167,7 +167,7 @@ lspci -D | \
 				    # ----------------------
                                     # Get size of disk
                                     if type fdisk > /dev/null 2>&1; then
-                                        size=`fdisk -l $dev 2> /dev/null | \
+                                        size=`fdisk -l $dev_path 2> /dev/null | \
 						grep '^Disk /' | \
 						sed -e "s@.*: \(.*\), .*@\1@" \
 						    -e 's@\.[0-9] @@'`
