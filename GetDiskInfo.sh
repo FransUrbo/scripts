@@ -47,9 +47,15 @@ lspci -D | \
 			    blocks=`find $path/target*/[0-9]* -maxdepth 0`
 			else
 			    # Third check - catch cciss targets.
-			    blocks=`find $path -name rev 2> /dev/null`
+			    blocks=`find $path -maxdepth 2 -name rev 2> /dev/null`
 			    if [ -n "$blocks" ]; then
 				blocks=`dirname $blocks`
+                            else
+                                # Fourth check - catch the SAS2LP
+                                ports=`find $path -maxdepth 2 -name 'port-?:?' -type d | head -n1`
+                                if [ -n "$ports" ]; then
+                                    blocks=`echo "$ports" | sed 's@/end_dev.*@@'`
+                                fi
 			    fi
 			fi
 		    fi
@@ -65,15 +71,21 @@ lspci -D | \
 				popd > /dev/null 2>&1
 				t_id=`basename "$path"`
 
+				if echo "$path" | egrep -q '/port-?:?'; then
+                                    # path: '/sys/devices/pci0000:00/0000:00:0b.0/0000:03:00.0/host0/port-0:0/end_device-0:0/target0:0:0/0:0:0:0'
+                                    host=`echo "$path" | sed "s@.*/host.*/\(.*\)/end_.*@\1@"`
+                                fi
+
 				# ----------------------
 				# Get name
+				name=""
 				if echo "$t_id" | egrep -q "^[0-9]" -a type lsscsi > /dev/null 2>&1; then
 				    name=`lsscsi --device "$t_id" | sed -e 's@.*/@@' -e 's@\[.*@@'`
 				fi
 				if [ -z "$name" -o "$name" == "-" ]; then
 				    # /sys/block/*/device | grep '/0000:05:00.0/host8/'
 				    name=`stat /sys/block/*/device | \
-					egrep "File: .*/$id/$host/" | \
+					egrep "File: .*/$id.*$host" | \
 					sed -e "s@.*block/\(.*\)/device'.*@\1@" \
 				            -e 's@.*\!@@'`
 				    if [ -z "$name" ]; then
