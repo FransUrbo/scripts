@@ -37,11 +37,12 @@ for($i=0; $i < $count; $i++) {
 	    print "\n" if(($line =~ /^dn: /) || ($line =~ /^dn:: /));
 	}
 
-	if($line =~ /^dn:: /) {
-	    $dn = (split('dn:: ', $line))[1];
-	    print "# dn: ".decode_base64("$dn")."\n";
-	}
-	print "$line\n";
+	if($line =~ /[a-zA-Z0-9]:: /) {
+	    ($attrib, $value) = split(':: ', $line);
+	    print "$attrib: ".decode_base64("$value")."\n";
+	} else {
+            print "$line\n";
+        }
 	$first = 1;
     }
 }
