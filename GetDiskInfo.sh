@@ -9,7 +9,7 @@ if type zpool > /dev/null 2>&1; then
     zpool status > $ZFS_TEMP 2> /dev/null
 fi
 
-printf "  %-9s %-4s %-20s%-45s%-10s%-10s%-10s%-20s%-8s\n\n" "Host" "Name" "Model" "Device by ID" "Rev" "MD" "VG" "ZFS" "Size"
+printf "  %-9s %-4s %-20s%-45s%-10s%-25s%-10s%-10s%-20s%-8s\n\n" "Host" "Name" "Model" "Device by ID" "Rev" "Serial" "MD" "VG" "ZFS" "Size"
 
 lspci -D | \
     egrep 'SATA|SCSI|IDE|RAID' | \
@@ -105,6 +105,13 @@ lspci -D | \
 				    rev="n/a"
 				fi
 
+                                # ... serial number
+                                if [ -b "/dev/$name" ]; then
+                                    serial=`hdparm -I /dev/$name | grep 'Serial Number:' | sed 's@.* @@'`
+                                else
+                                    serial="n/a"
+                                fi
+
 				# ----------------------
 				DID="n/a"
 				if [ -n "$name" -a "$name" != "n/a" ]; then
@@ -198,7 +205,7 @@ lspci -D | \
 
 				# ----------------------
 				# Output information
-				printf "  %-9s %-4s %-20s%-45s%-10s%-10s%-10s%-20s%8s\n" $host $name "$model" "$DID" $rev $md $vg "$zfs" "$size"
+				printf "  %-9s %-4s %-20s%-45s%-10s%-25s%-10s%-10s%-20s%8s\n" $host $name "$model" "$DID" $rev $serial $md $vg "$zfs" "$size"
 			    done # => 'while read block; do'
 		    else
 			printf "  %-9s n/a\n" $host
