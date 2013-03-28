@@ -132,6 +132,10 @@ lspci -D | \
 				    # ----------------------
 				    # Get ZFS pool data for this disk ID
 				    if [ -n "$DO_ZFS" ]; then
+                                        # OID: SATA_Corsair_Force_311486508000008952122
+                                        # ZFS: ata-Corsair_Force_3_SSD_11486508000008952122
+                                        tmpnam=`echo "$DID" | sed "s@SATA_\(.*_.*\)_[0-9].*@\1@"`
+
 					zfs=$(cat $ZFS_TEMP | 
 					    while read zpool; do
 						if echo "$zpool" | grep -q 'pool: '; then
@@ -141,7 +145,7 @@ lspci -D | \
 						    shift ; shift ; shift ; shift ; shift
 						elif echo "$zpool" | egrep -q '^raid|^mirror|^cache|^spare'; then
 						    zfs_vdev=`echo "$zpool" | sed 's@ .*@@'`
-						elif echo "$zpool" | egrep -q "$DID|$name"; then
+						elif echo "$zpool" | egrep -q "$DID|$name|$tmpnam"; then
 						    if ! echo "$zpool" | egrep -q "ONLINE|AVAIL"; then
 							offline="!"
 							if echo "$zpool" | grep -q "OFFLINE"; then
@@ -157,7 +161,7 @@ lspci -D | \
 							printf "%-17s$offline" "$zfs_name / $zfs_vdev"
 						    fi
 						fi
-						done)
+					    done)
 					[ -z "$zfs" ] && zfs="n/a"
 				    fi
 
