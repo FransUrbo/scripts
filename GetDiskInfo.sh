@@ -9,7 +9,7 @@ if type zpool > /dev/null 2>&1; then
     zpool status > $ZFS_TEMP 2> /dev/null
 fi
 
-printf "  %-7s %-4s %-20s%-45s%-10s%-10s%-10s%-20s%-8s\n\n" "Host" "Name" "Model" "Device by ID" "Rev" "MD" "VG" "ZFS" "Size"
+printf "  %-9s %-4s %-20s%-45s%-10s%-10s%-10s%-20s%-8s\n\n" "Host" "Name" "Model" "Device by ID" "Rev" "MD" "VG" "ZFS" "Size"
 
 lspci -D | \
     egrep 'SATA|SCSI|IDE|RAID' | \
@@ -25,9 +25,10 @@ lspci -D | \
         echo "$line"
 
 	# First while, just to sort '.../host2' before '.../host10'.
-	find /sys/bus/pci/devices/$id/{host*,ide*,cciss*} -maxdepth 0 2> /dev/null | \
+	find /sys/bus/pci/devices/$id/{host*,ide*,ata*,cciss*} -maxdepth 0 2> /dev/null | \
 	    while read path; do
-	    host=`echo "$path" | sed -e 's@.*/host\(.*\)@\1@' -e 's@.*/ide\(.*\)@\1@' -e 's@.*/cciss\(.*\)@\1@'`
+	    host=`echo "$path" | sed -e 's@.*/host\(.*\)@\1@' -e 's@.*/ide\(.*\)@\1@' \
+			-e 's@.*/ata\(.*\)@\1@' -e 's@.*/cciss\(.*\)@\1@'`
 	    printf "host%0.2d;$path\n" "$host"
 	done | \
 	    sort | \
@@ -46,19 +47,19 @@ lspci -D | \
 			if [ -n "$blocks" ]; then
 			    blocks=`find $path/target*/[0-9]* -maxdepth 0`
 			else
-			    # Third check - catch cciss targets.
-			    blocks=`find $path -maxdepth 2 -name rev 2> /dev/null`
-			    if [ -n "$blocks" ]; then
-				blocks=`dirname $blocks`
+                            # Third check - catch the SAS2LP
+                            ports=`find $path -maxdepth 2 -name 'port-?:?' -type d | head -n1`
+                            if [ -n "$ports" ]; then
+                                blocks=`echo "$ports" | sed 's@/end_dev.*@@'`
                             else
-                                # Fourth check - catch the SAS2LP
-                                ports=`find $path -maxdepth 2 -name 'port-?:?' -type d | head -n1`
-                                if [ -n "$ports" ]; then
-                                    blocks=`echo "$ports" | sed 's@/end_dev.*@@'`
+				# Fouth check - catch cciss targets.
+                                blocks=`find $path -name rev 2> /dev/null`
+                                if [ -n "$blocks" ]; then
+                                    blocks=`dirname $blocks`
                                 fi
-			    fi
-			fi
-		    fi
+                            fi
+                        fi
+                    fi
 
 		    # ----------------------
 		    if [ -n "$blocks" ]; then
@@ -193,10 +194,10 @@ lspci -D | \
 
 				# ----------------------
 				# Output information
-				printf "  %-7s %-4s %-20s%-45s%-10s%-10s%-10s%-20s%8s\n" $host $name "$model" "$DID" $rev $md $vg "$zfs" "$size"
+				printf "  %-9s %-4s %-20s%-45s%-10s%-10s%-10s%-20s%8s\n" $host $name "$model" "$DID" $rev $md $vg "$zfs" "$size"
 			    done # => 'while read block; do'
 		    else
-			printf "  %-7s n/a\n" $host
+			printf "  %-9s n/a\n" $host
 		    fi
 		done # => 'while read path; do'
 
