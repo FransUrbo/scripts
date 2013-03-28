@@ -17,6 +17,49 @@ $TV_SERIES_MATCH = 'TV_Series';
 
 %CASTS = (); %GENRES = (); %YEARS = (); %DIRECTORS = ();
 
+# ------------------------------------------
+sub get_size() {
+    my $dir = shift;
+    my $format;
+
+    my $origsize=`du -sh "$dir/"`;
+    chomp($origsize);
+
+    my $size =  $origsize;
+    $size =~ s/	.*//;
+
+    $size =~ s/,/\./;
+    if($size =~ /K$/) {
+	$size =~ s/K$//;
+	$format = 'K';
+    } elsif($size =~ /M$/) {
+	$size =~ s/M$//;
+	$format = 'M';
+    } elsif($size =~ /G$/) {
+	$size =~ s/G$//;
+	$format = 'G';
+    } elsif($size =~ /T$/) {
+	$size =~ s/T$//;
+	$format = 'T';
+    } else {
+	$format = ' ';
+    }
+
+    $size = $size.$format;
+
+    # ----
+
+    if(-e "$dir/.complete") {
+	$complete = "*";
+    } elsif(-e "$dir/.verified") {
+	$complete = "+";
+    } else {
+	$complete = " ";
+    }
+
+    return(($size, $complete));
+}
+
 # --------------------------------------------
 sub update_list() {
     my($string) = @_;
@@ -45,12 +88,17 @@ sub update_list() {
 sub translate_string() {
     my($string) = @_;
 
+    $string =~ s/&#27;//i;
+    $string =~ s/&#x27//i;
+
+    $string =~ s/&#39;/\'/i;
+    $string =~ s/&#x39/\'/i;
+
     $string =~ s/\&eacute;/e/i;
     $string =~ s/\&aacute;/a/i;
     $string =~ s/\&iacute;/i/i;
     $string =~ s/\&oacute;/o/i;
     $string =~ s/\&ntilde;/n/i;
-    $string =~ s/\&\#39;/\'/i;
     $string =~ s/\&nbsp;/ /i;
     $string =~ s/\&raquo;/r/i;
     $string =~ s/\&ouml;/o/i;
@@ -60,6 +108,20 @@ sub translate_string() {
     $string =~ s/\&aring;/a/i;
     $string =~ s/\&oring;/o/i;
     $string =~ s/\&oslash;/?/i;
+
+    $string =~ s/([^\x20-\x7E])/sprintf("&#x%X;", ord($1))/eg;
+
+#    my $fixed = "";
+#    my @chars = split //, $string;
+#    foreach my $char (@chars) {
+#	if (ord($char) > 0x7f) {
+#            # This is where we handle all non 7-bit ascii
+#            $fixed .= sprintf "&#%02x;", ord($char);
+#        } else {
+#            $fixed .= $char;
+#        }
+#    }
+#    $string = $fixed if($fixed);
 
     return($string);
 }
@@ -87,6 +149,7 @@ sub imdb_lookup() {
 
 	if($line =~ /^Title .*:/) {
 	    $imdb_title = $data;
+	    $imdb_title =~ s/([a-z]): /$1 - /;
 	} elsif($line =~ /^Year .*:/) {
 	    if($title =~ /^[0-9][0-9][0-9][0-9] /) {
 		# Special case - bug in imdb-mf: Actual year is on next line
@@ -136,7 +199,7 @@ sub imdb_lookup() {
 	    while(($line = <IMDB>) !~ /^$/) {
 		chomp($line);
 
-		$data .= $line."<br>";
+		$data .= $line; #."<br>";
 	    }
 
 	    $plot = $data;
@@ -177,6 +240,14 @@ sub imdb_lookup() {
 }
 
 # --------------------------------------------
+# Overwrite ZFS_SHARE and ZFS_SHARE_ADDITIONAL
+if($#ARGV >= 0) {
+    $ZFS_SHARE = $ARGV[0];
+    $ZFS_SHARE_ADDITIONAL = "";
+}
+$ZFS_SHARE_ADDITIONAL = $ARGV[0] if($#ARGV >= 1);
+
+# --------------------------------------------
 if(open(LIST, ".mkmovielist.list")) {
     while(! eof(LIST)) {
 	my $line = <LIST>;
@@ -193,21 +264,18 @@ if(open(LIST, ".mkmovielist.list")) {
 # --------------------------------------------
 $movie_nr = 1;
 
-open(FS, "zfs list -H -r '$ZFS_SHARE' '$ZFS_SHARE_ADDITIONAL' -o mountpoint 2> /dev/null | sort | ")
+open(FS, "zfs list -H -r '$ZFS_SHARE' '$ZFS_SHARE_ADDITIONAL' -o mountpoint 2> /dev/null | sort |")
     || die("Can't open ZFS shares list, $!\n");
 while(! eof(FS)) {
     my $fs = <FS>;
     chomp($fs);
 
-    if($fs =~ /Movies/) {
-	$type = 'f';
-	$wild = '';
-    } elsif($fs =~ /$TV_SERIES_MATCH/) {
+    if($fs =~ /$TV_SERIES_MATCH/) {
 	$type = 'd';
 	$wild = '/*';
     } else {
-	print "ERROR: Don't know how to find. Check the code!\n";
-	exit(1);
+	$type = 'f';
+	$wild = '';
     }
 
     open(FIND, "find \"$fs\"$wild -maxdepth 1 -type $type | ")
@@ -216,7 +284,7 @@ while(! eof(FS)) {
 	my $file = <FIND>;
 	chomp($file);
 
-	# --------------------------------------------
+	# Remove crap we're not interested in anyway.
 	next if(($file =~ /\.zfs$/i) ||
 		($file =~ /\.srt$/i) ||
 		($file =~ /\.idx$/i) ||
@@ -237,15 +305,31 @@ while(! eof(FS)) {
 		($file =~ /lrc-natm\.r5/) ||
 		($file =~ /Store/) ||
 		($file =~ /cnid2/) ||
-		($file =~ /^_.*/) ||
+		($file =~ /\/_.*/) ||
+		($file =~ /Clips/i) ||
 		($file =~ /\.Apple/) ||
+
+		($file =~ /Commercials/) ||
 		($file =~ /Parent/) ||
 		($file =~ /volinfo/) ||
 		($file =~ /Subtitles/) ||
 		($file =~ /Extras/) ||
+		($file =~ /Season /i) ||
 		($file =~ /VTS/) ||
 		($file =~ /Pixar Short Films Collection/) ||
-		($file =~ /Walt Disney\'s Fables/));
+		($file =~ /Spinoffs\//i) ||
+		($file =~ /Making Of/i) ||
+		($file =~ /Walt Disney\'s Fables/) ||
+		($file =~ /Network Trash Folder/) ||
+		($file =~ /Temporary Items/));
+
+	# Catch container dirs
+	if(-d "$file") {
+	    $cnt = `find "$file" -maxdepth 1 -type f 2> /dev/null | wc -l`;
+	    chomp($cnt);
+
+	    next if(!$cnt);
+	}
 
 	# --------------------------------------------
 	my $name = $file;
@@ -286,7 +370,7 @@ while(! eof(FS)) {
 
 	printf("%4d: $file -> $name: ", $movie_nr);
 
-	my($DO_IMDB, $UPDATE_LIST) = (1, 0);
+	my($DO_IMDB, $DO_SIZE, $UPDATE_LIST) = (1, 1, 0);
 	if($MOVIES{"$name"}) {
 	    ($dummy, $dummy, $dummy, $url, $year, $genres, $casts, $directors, $plot) =
 		split(';', $MOVIES{"$name"});
@@ -307,12 +391,17 @@ while(! eof(FS)) {
 
 	if($DO_IMDB) {
 	    ($dummy, $year, $genres, $casts, $directors, $url, $plot) = &imdb_lookup($title);
-	    $genres = "TV Series, $genres" if($genres && ($file =~ /$TV_SERIES_MATCH/) && ($genres !~ /^TV Series/));
+
+	    $genres = "TV Series, $genres"
+		if($genres &&
+		   ($file =~ /$TV_SERIES_MATCH/) &&
+		   ($genres !~ /^TV Series/));
 
 	    if($url) {
 		if(!$MOVIES{"$name"}) {
 		    if($UPDATE_LIST) {
 			print "FOUND:UPDATE";
+
 			&update_list("$file;$name;$title;$url;$year;$genres;$casts;$directors;$plot");
 		    } else {
 			print "FOUND:NEW";
@@ -328,10 +417,32 @@ while(! eof(FS)) {
 	    }
 	} else {
 	    print "EXISTING";
-	    $genres = "TV Series, $genres" if($genres && ($file =~ /$TV_SERIES_MATCH/) && ($genres !~ /^TV Series/));
+
+	    $genres = "TV Series, $genres"
+		if($genres &&
+		   ($file =~ /$TV_SERIES_MATCH/) &&
+		   ($genres !~ /^TV Series/));
 	}
 
 	$ENTRIES{"$name"} = "$file;$name;$title;$url;$year;$genres;$casts;$directors;$plot";
+
+	if($DO_SIZE && -d "$file") {
+	    my ($size, $complete) = &get_size($file);
+
+	    my $dir = $file;
+	    $dir =~ s/\/$ZFS_SHARE\///;
+	    $dir =~ s/\/$ZFS_SHARE_ADDITIONAL\///;
+
+	    $SIZE{$dir} = "$size:$complete";
+
+	    if($complete eq '*') {
+		push(@CHECKED, $dir);
+	    } elsif($complete eq '+') {
+		push(@VERIFIED, $dir);
+	    } else {
+		push(@REST, $dir);
+	    }
+	}
 
 	if($url) {
 	    $ENTRIES{"$name"} .= ";$url";
@@ -349,15 +460,22 @@ close(FS);
 
 # --------------------------------------------
 open(HTML, "> /$ZFS_SHARE.html")
-    || die("Can't open output html file, $!\n");
+    || die("Can't open output html file '/$ZFS_SHARE.html', $!\n");
 
 open(TEXT, "> /$ZFS_SHARE.txt")
-    || die("Can't open output text file, $!\n");
+    || die("Can't open output text file '/$ZFS_SHARE.txt', $!\n");
+
+open(RSS, "> /$ZFS_SHARE.xml")
+    || die("Can't open output RSS file '/$ZFS_SHARE.xml', $!\n");
+
+open(SIZE, "> /$ZFS_SHARE.sizes")
+    || die("Can't open output size file '/$ZFS_SHARE.sizes', $!\n");
 
 $ENV{'LANG'} = "C";
 $cur_date = `date`;
 chomp($cur_date);
 
+# ----- HTML header
 print HTML "<html>
   <head>
     <title>The Movie Data Base</title>
@@ -380,26 +498,54 @@ print HTML "<html>
       </tr>
 ";
 
+# ----- RSS header
+print RSS "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\">
+  <channel>
+    <title>TV/Movie List</title>
+    <link>http://www.bayour.com/misc/Movies.xml</link>
+    <atom:link href=\"http://bayour.com/misc/Movies.xml\" rel=\"self\" type=\"application/rss+xml\" />
+    <description>Movies and TV Series</description>
+    <language>en-us</language>
+    <docs>http://blogs.law.harvard.edu/tech/rss</docs>
+    <generator>Emacs and Scripting by Turbo</generator>
+";
+
+my $cnt = 1;
+my %URLS;
+
 $class = "c1";
+
 for my $entry (sort keys %ENTRIES) {
     my($file, $name, $title, $url, $year, $genres, $casts, $directors, $plot) =
 	split(';', $ENTRIES{"$entry"});
 
-    $name      =~ s/^The (.*)/$1, The/;
-    $name      = &translate_string($name);
+    $name  =~ s/^The (.*)/$1, The/;
+    $name  =~ s/ \& / and /g;
+    $name  =  &translate_string($name);
 
-    if(!$plot) {
-	$plot  = '';
-    } else {
-	$plot  =~ s/\"/\'/g;
-	$plot  =~ s/<br>/&#10;&#13;/g;
-    }
+    $name  =~ s/&#xC3;&#x96;/ö/;
+    $name  =~ s/&#xC3;&#xB6;/ö/;
+    $name  =~ s/&#xCC;&#x88;/ä/;
 
+    $casts =~ s/ \| See full cast and crew//i;
+
+    $plot  =~ s/([^\x20-\x7E])/sprintf("&#x%X;", ord($1))/eg;
+    $plot  =~ s/&#x27//g;
+    $plot  =~ s/\"/\'/g;
+    $plot  =~ s/\<br\>/ /g;
+    $plot  =~ s/ \& / and /g;
+    $plot  =~ s/ See full synopsis.*//;
+
+    $url_plot  = "$file&#10;&#13;".$plot;
+
+    # ----- TEXT entry
     print TEXT "$name\n";
 
+    # ----- HTML entry
     print HTML "\n      <tr align=\"left\" class=\"$class\">\n";
     if($url) {
-	print HTML "        <th width=\"40%\"><a href=\"$url\" title=\"$plot\">$name</a></th>\n";
+	print HTML "        <th width=\"40%\"><a href=\"$url\" title=\"$url_plot\">$name</a></th>\n";
     } else {
 	print HTML "        <th width=\"40%\">$name</th>\n";
     }
@@ -414,11 +560,59 @@ for my $entry (sort keys %ENTRIES) {
     } else {
 	$class = "c1";
     }
+
+    # ----- RSS entry
+    print RSS "\n    <item>\n";
+    if($genres =~ /^TV Series/) {
+	print RSS "      <title>Serie: $name</title>\n";
+    } else {
+	print RSS "      <title>Movie: $name</title>\n";
+    }
+    print RSS "      <description>$plot</description>\n";
+    if($url) {
+	print RSS "      <link>$url</link>\n";
+
+	if($URLS{$url}) {
+	    print RSS "      <guid>$url#$cnt</guid>\n";
+	    $cnt++;
+	} else {
+	    print RSS "      <guid>$url</guid>\n";
+	    $URLS{$url} = 1;
+	}
+    } else {
+	print RSS "      <guid isPermaLink=\"false\">none #$cnt</guid>\n";
+	    $cnt++;
+    }
+    print RSS "    </item>\n";
 }
 
+# ----- HTML tail
 print HTML "    </table>
   </body>
 </html>
 ";
 
+# ----- RSS tail
+print RSS "  </channel>
+</rss>
+";
+
 close(HTML);
+close(RSS);
+
+# ----- SIZE
+foreach $dir (sort keys %SIZE) {
+    ($size, $complete) = split(':', $SIZE{$dir});
+    $complete = " " if(!$complete);
+
+    printf(SIZE "%s %7s	%s\n", $complete, $size, $dir);
+}
+
+printf(SIZE "\n");
+printf(SIZE "* => Complete series (%d series, %d including verified).\n", $#CHECKED, $#CHECKED + $#VERIFIED);
+printf(SIZE "+ => Complete, checked and verified series (%d series).\n", $#VERIFIED);
+printf(SIZE "     Total number of TV series: %d\n\n", $#CHECKED + $#VERIFIED + $#REST);
+printf(SIZE "List created %s\n", `date -R`);
+
+close(SIZE);
+
