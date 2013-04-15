@@ -9,7 +9,23 @@ if type zpool > /dev/null 2>&1; then
     zpool status > $ZFS_TEMP 2> /dev/null
 fi
 
-printf "  %-9s %-4s %-20s%-45s%-10s%-25s%-10s%-10s%-20s%-8s\n\n" "Host" "Name" "Model" "Device by ID" "Rev" "Serial" "MD" "VG" "ZFS" "Size"
+DO_PVM=0
+if type pvs > /dev/null 2>&1; then
+    DO_PVM=1
+    PVM_TEMP=`tempfile -d /tmp -p pvm.`
+    pvs --noheadings --nosuffix --separator , \
+        >  $PVM_TEMP \
+        2> /dev/null
+fi
+
+DO_MD=0
+[ -f "/proc/mdstat" ] && DO_MD=1
+
+printf "  %-9s %-4s %-20s%-45s%-10s%-25s" "Host" "Name" "Model" "Device by ID" "Rev" "Serial"
+[ -n "$DO_MD" ] && printf "%-10s" "MD"
+[ -n "$DO_PVM" -a -f "$PVM_TEMP" ] && printf "%-10s" "VG"
+[ -n "$DO_ZFS" -a -f "$ZFS_TEMP" ] && printf "%-20s" "ZFS"
+printf "%-8s\n\n" "Size"
 
 lspci -D | \
     egrep 'SATA|SCSI|IDE|RAID' | \
@@ -48,14 +64,14 @@ lspci -D | \
 			    blocks=`find $path/target*/[0-9]* -maxdepth 0`
 			else
                             # Third check - catch the SAS2LP
-                            ports=`find $path -maxdepth 2 -name 'port-?:?' -type d | head -n1`
+                            ports=`find $path -maxdepth 2 -name 'port-*:?' -type d | head -n1`
                             if [ -n "$ports" ]; then
                                 blocks=`echo "$ports" | sed 's@/end_dev.*@@'`
                             else
 				# Fouth check - catch cciss targets.
                                 blocks=`find $path -name rev 2> /dev/null`
                                 if [ -n "$blocks" ]; then
-                                    blocks=`dirname $blocks`
+                                    blocks=`dirname "$blocks"`
                                 fi
                             fi
                         fi
@@ -72,7 +88,7 @@ lspci -D | \
 				popd > /dev/null 2>&1
 				t_id=`basename "$path"`
 
-				if echo "$path" | egrep -q '/port-?:?'; then
+				if echo "$path" | egrep -q '/port-*:?'; then
                                     # path: '/sys/devices/pci0000:00/0000:00:0b.0/0000:03:00.0/host0/port-0:0/end_device-0:0/target0:0:0/0:0:0:0'
                                     host=`echo "$path" | sed "s@.*/host.*/\(.*\)/end_.*@\1@"`
                                 fi
@@ -107,15 +123,18 @@ lspci -D | \
 
                                 # ... serial number
                                 if [ -b "/dev/$name" ]; then
-                                    serial=`hdparm -I /dev/$name | grep 'Serial Number:' | sed 's@.* @@'`
-                                else
-                                    serial="n/a"
+                                    if type hdparm > /dev/null 2>&1; then
+                                        serial=`hdparm -I /dev/$name 2> /dev/null | \
+					    grep 'Serial Number:' | sed 's@.* @@'`
+                                    fi
                                 fi
+                                [ -z "$serial" ] && serial="n/a"
 
 				# ----------------------
 				DID="n/a"
 				if [ -n "$name" -a "$name" != "n/a" ]; then
-				    if [ -f "/proc/mdstat" ]; then
+				    # ----------------------
+				    if [ -n "$DO_MD" ]; then
 					# Get MD device
 					MD=`grep $name /proc/mdstat | sed 's@: active raid1 @@'`
 					if [ -n "$MD" ]; then
@@ -128,23 +147,53 @@ lspci -D | \
 						fi
 					    done
 					fi
+                                        [ -z "$md" ] && md="n/a"
 				    fi
 
 				    # ----------------------
 				    if [ -d "/dev/disk/by-id" ]; then
 					# Get device name (Disk by ID)
-					DID=`/bin/ls -l /dev/disk/by-id/$type* | grep -v part | grep $name | sed "s@.*/$type-\(.*\) -.*@\1@"`
+					DID=`/bin/ls -l /dev/disk/by-id/$type* | \
+					    grep -v part | \
+					    grep $name | \
+					    sed "s@.*/$type-\(.*\) -.*@\1@"`
+                                        if [ -z "$DID" ]; then
+                                            # Try again, with a partition.
+                                            DID=`/bin/ls -l /dev/disk/by-id/$type* | \
+						grep $name | \
+						sed "s@.*/$type-\(.*\)-part.* -.*@\1@" | \
+						head -n1`
+                                        fi
 				    fi
 
 				    # ----------------------
 				    # Get ZFS pool data for this disk ID
-				    if [ -n "$DO_ZFS" ]; then
-                                        # OID: SATA_Corsair_Force_311486508000008952122
-                                        # ZFS: ata-Corsair_Force_3_SSD_11486508000008952122
-                                        tmpnam=`echo "$DID" | sed "s@SATA_\(.*_.*\)_[0-9].*@\1@"`
+				    if [ -n "$DO_ZFS" -a -f "$ZFS_TEMP" ]; then
+					# OID: SATA_Corsair_Force_311486508000008952122
+					# ZFS: ata-Corsair_Force_3_SSD_11486508000008952122
+					tmpnam=`echo "$DID" | sed "s@SATA_\(.*_.*\)_[0-9].*@\1@"`
+
+                                        # Setup a matching string.
+                                        # egrep matches _every line_ if 'NULL|sda|NULL'!
+                                        [ -n "$DID" ] && zfs_regexp="$DID"
+                                        if [ -n "$name" ]; then
+                                            if [ -n "$zfs_regexp" ]; then
+                                                zfs_regexp="$zfs_regexp|$name"
+                                            else
+                                                zfs_regexp="$name"
+                                            fi
+                                        fi
+                                        if [ -n "$tmpnam" ]; then
+                                            if [ -n "$zfs_regexp" ]; then
+                                                zfs_regexp="$zfs_regexp|$tmpnam"
+                                            else
+                                                zfs_regexp="$tmpnam"
+                                            fi
+                                        fi
 
 					zfs=$(cat $ZFS_TEMP | 
 					    while read zpool; do
+                                                offline=""
 						if echo "$zpool" | grep -q 'pool: '; then
 						    zfs_name=`echo "$zpool" | sed 's@.*: @@'`
 						elif echo "$zpool" | grep -q 'state: '; then
@@ -152,19 +201,21 @@ lspci -D | \
 						    shift ; shift ; shift ; shift ; shift
 						elif echo "$zpool" | egrep -q '^raid|^mirror|^cache|^spare'; then
 						    zfs_vdev=`echo "$zpool" | sed 's@ .*@@'`
-						elif echo "$zpool" | egrep -q "$DID|$name|$tmpnam"; then
+						elif echo "$zpool" | egrep -q "$zfs_regexp"; then
 						    if ! echo "$zpool" | egrep -q "ONLINE|AVAIL"; then
 							offline="!"
 							if echo "$zpool" | grep -q "OFFLINE"; then
-							    offline="$offline"OFFLINE
+							    offline="$offline"O
 							elif echo "$zpool" | grep -q "UNAVAIL"; then
-							    offline="$offline"UNAVAIL
+							    offline="$offline"U
 							elif echo "$zpool" | grep -q "FAULTED"; then
-							    offline="$offline"FAULTED
+							    offline="$offline"F
+							elif echo "$zpool" | grep -q "REMOVED"; then
+							    offline="$offline"R
 							fi
 						    fi
 
-						    if [ "x$zfs_name" != "x" -a "x$zfs_vdev" != "x" ]; then
+						    if [ "x$zfs_name" != "" -a "$zfs_vdev" != "" ]; then
 							printf "%-17s$offline" "$zfs_name / $zfs_vdev"
 						    fi
 						fi
@@ -175,37 +226,40 @@ lspci -D | \
 				    # ----------------------
 				    # Get LVM data (VG - Virtual Group) for this disk
 				    lvm_regexp="/$name"
-				    [ -n "$md" ] && lvm_regexp="$lvm_regexp|$md"
-				    if type pvs > /dev/null 2>&1; then
-					vg=$(pvs --noheadings --nosuffix --separator , | \
+				    [ -n "$md" -a "$md" != "n/a" ] && lvm_regexp="$lvm_regexp|$md"
+				    if [ -n "$DO_PVM" -a -f "$PVM_TEMP" ]; then
+					vg=$(cat $PVM_TEMP |
 					    while read pvs; do
 						if echo "$pvs" | egrep -q "$lvm_regexp"; then
 						    echo "$pvs" | sed "s@.*,\(.*\),lvm.*@\1@"
 						fi
 					    done)
+                                        [ -z "$vg" ] && vg="n/a"
 				    fi
 
-				    [ -z "$md" ] && md="n/a"
-                                    [ -z "$vg" ] && vg="n/a"
-
 				    # ----------------------
-                                    # Get size of disk
-                                    if type fdisk > /dev/null 2>&1; then
-                                        size=`fdisk -l $dev_path 2> /dev/null | \
+				    # Get size of disk
+				    if type fdisk > /dev/null 2>&1; then
+					size=`fdisk -l $dev_path 2> /dev/null | \
 						grep '^Disk /' | \
 						sed -e "s@.*: \(.*\), .*@\1@" \
 						    -e 's@\.[0-9] @@'`
-                                        if echo "$size" | egrep -q '^[0-9][0-9][0-9][0-9]GB'; then
-                                            s=`echo "$size" | sed 's@GB@@'`
-                                            size=`echo "scale=2; $s / 1024" | bc`"TB"
-                                        fi
-                                    fi
-                                    [ -z "$size" ] && size="n/a"
+					if echo "$size" | egrep -q '^[0-9][0-9][0-9][0-9]GB'; then
+					    s=`echo "$size" | sed 's@GB@@'`
+					    size=`echo "scale=2; $s / 1024" | bc`"TB"
+					fi
+				    fi
+				    [ -z "$size" ] && size="n/a"
 				fi
 
 				# ----------------------
 				# Output information
-				printf "  %-9s %-4s %-20s%-45s%-10s%-25s%-10s%-10s%-20s%8s\n" $host $name "$model" "$DID" $rev $serial $md $vg "$zfs" "$size"
+				printf "  %-9s %-4s %-20s%-45s%-10s%-25s" \
+                                    $host $name "$model" "$DID" $rev $serial
+                                [ -n "$DO_MD" ] && printf "%-10s" "$md"
+                                [ -n "$DO_PVM" -a -f "$PVM_TEMP" ] && printf "%-10s" "$vg"
+                                [ -n "$DO_ZFS" -a -f "$ZFS_TEMP" ] && printf "%-20s" "$zfs"
+                                printf "%8s\n" "$size"
 			    done # => 'while read block; do'
 		    else
 			printf "  %-9s n/a\n" $host
@@ -216,3 +270,4 @@ lspci -D | \
     done
 
 [ -n "$ZFS_TEMP" ] && rm -f $ZFS_TEMP
+[ -n "$PVM_TEMP" ] && rm -f $PVM_TEMP
