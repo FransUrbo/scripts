@@ -213,6 +213,8 @@ lspci -D | \
 							elif echo "$zpool" | grep -q "REMOVED"; then
 							    offline="$offline"R
 							fi
+                                                    elif echo "$zpool" | grep -q "resilvering"; then
+                                                        offline=" "rs
 						    fi
 
 						    if [ "x$zfs_name" != "" -a "$zfs_vdev" != "" ]; then
