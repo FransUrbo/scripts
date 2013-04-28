@@ -21,11 +21,30 @@ fi
 DO_MD=
 [ -f "/proc/mdstat" ] && DO_MD=1
 
+if type cryptsetup > /dev/null 2>&1; then
+    if [ -d /dev/mapper ]; then
+	DO_DMCRYPT=1			# Look for crypted disks?
+	DMCRYPT=""			# List of crypted devices:real dev
+	CRYPTED_HAVE_BEEN_SEEN=""	# Have we found any crypted disks?
+
+	for dev_path in /dev/mapper/*; do
+	    [ "$dev_path" == "/dev/mapper/control" ] && continue
+
+	    name=`basename "$dev_path"`
+	    dev=`cryptsetup status $name | grep device: | sed 's@.*/@@'`
+	    DMCRYPT="$DMCRYPT $name:$dev"
+	done
+    else
+	DO_DMCRYPT=
+    fi
+fi
+
 printf "  %-9s %-4s %-20s%-45s%-10s%-25s" "Host" "Name" "Model" "Device by ID" "Rev" "Serial"
 [ -n "$DO_MD" ] && printf "%-10s" "MD"
 [ -n "$DO_PVM" -a -f "$PVM_TEMP" ] && printf "%-10s" "VG"
-[ -n "$DO_ZFS" -a -f "$ZFS_TEMP" ] && printf "%-20s" "ZFS"
-printf "%-8s\n\n" "Size"
+[ -n "$DO_DMCRYPT" -a -n "$DMCRYPT" ]  && printf "%-25s" "DM-CRYPT"
+[ -n "$DO_ZFS" -a -f "$ZFS_TEMP" ] && printf "%-25s" "    ZFS"
+printf "  %8s\n\n" "Size"
 
 lspci -D | \
     egrep 'SATA|SCSI|IDE|RAID' | \
@@ -191,10 +210,18 @@ lspci -D | \
                                                 zfs_regexp="$tmpnam"
                                             fi
                                         fi
+					if [ -n "$DO_DMCRYPT" -a -n "$DMCRYPT" ]; then
+					    for dm_dev_name in $DMCRYPT; do
+						if echo $dm_dev_name | grep -q ":$name"; then
+						    tmpdmname=`echo "$dm_dev_name" | sed 's@:.*@@'`
+						    zfs_regexp="$zfs_regexp|$tmpdmname"
+						fi
+					    done
+					fi
 
 					zfs=$(cat $ZFS_TEMP | 
 					    while read zpool; do
-                                                offline=""
+                                                offline="" ; crypted=" "
 						if echo "$zpool" | grep -q 'pool: '; then
 						    zfs_name=`echo "$zpool" | sed 's@.*: @@'`
 						elif echo "$zpool" | grep -q 'state: '; then
@@ -218,12 +245,16 @@ lspci -D | \
                                                         offline=" "rs
 						    fi
 
+						    if echo "$zpool" | egrep -q "$tmpdmname"; then
+							crypted="*"
+						    fi
+
 						    if [ "x$zfs_name" != "" -a "$zfs_vdev" != "" ]; then
-							printf "%-17s$offline" "$zfs_name / $zfs_vdev"
+							printf "$crypted %-17s$offline" "$zfs_name / $zfs_vdev"
 						    fi
 						fi
 					    done)
-					[ -z "$zfs" ] && zfs="n/a"
+					[ -z "$zfs" ] && zfs="  n/a"
 				    fi
 
 				    # ----------------------
@@ -238,6 +269,19 @@ lspci -D | \
 						fi
 					    done)
                                         [ -z "$vg" ] && vg="n/a"
+				    fi
+
+				    # ----------------------
+				    # Get DM-CRYPT device mapper name
+				    if [ -n "$DO_DMCRYPT" -a -n "$DMCRYPT" ]; then
+					for dm_dev_name in $DMCRYPT; do
+					    set -- `echo $dm_dev_name | sed 's@:@ @'`
+					    dm_name=$1 ; dm_dev=$2
+
+					    echo "$DID" | grep -q "$dm_name" && dmcrypt=$dm_name
+					    [ "$name" == "$dm_dev" ] && dmcrypt=$dm_name
+					done
+                                        [ -z "$dmcrypt" ] && dmcrypt="n/a"
 				    fi
 
 				    # ----------------------
@@ -263,7 +307,8 @@ lspci -D | \
                                     $host $name "$model" "$DID" $rev $serial
                                 [ -n "$DO_MD" ] && printf "%-10s" "$md"
                                 [ -n "$DO_PVM" -a -f "$PVM_TEMP" ] && printf "%-10s" "$vg"
-                                [ -n "$DO_ZFS" -a -f "$ZFS_TEMP" ] && printf "%-20s" "$zfs"
+                                [ -n "$DO_DMCRYPT" -a -n "$DMCRYPT" ] && printf "%-25s" "$dmcrypt"
+                                [ -n "$DO_ZFS" -a -f "$ZFS_TEMP" ] && printf "  %-25s" "$zfs"
                                 printf "%8s\n" "$size"
 			    done # => 'while read block; do'
 		    else
@@ -274,5 +319,6 @@ lspci -D | \
         echo
     done
 
+[ -n "$DO_DMCRYPT" ] && echo "* => is a dm-crypt device"
 [ -n "$ZFS_TEMP" ] && rm -f $ZFS_TEMP
 [ -n "$PVM_TEMP" ] && rm -f $PVM_TEMP
