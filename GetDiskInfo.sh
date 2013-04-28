@@ -132,7 +132,7 @@ lspci -D | \
                                 dev_path=`find /dev -name "$name" -type b`
 
 				# ... model
-				model=`cat "$path/model"`
+				model=`cat "$path/model" | sed 's@-.*@@'`
 
 				# ... and revision
 				if [ -f "$path/rev" ]; then
