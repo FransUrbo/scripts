@@ -245,9 +245,11 @@ lspci -D | \
                                                         offline=" "rs
 						    fi
 
-						    if echo "$zpool" | egrep -q "$tmpdmname"; then
-							crypted="*"
-						    fi
+                                                    if [ -n "$DO_DMCRYPT" -a -n "$DMCRYPT" ]; then
+                                                        if echo "$zpool" | egrep -q "$tmpdmname"; then
+                                                            crypted="*"
+                                                        fi
+                                                    fi
 
 						    if [ "x$zfs_name" != "" -a "$zfs_vdev" != "" ]; then
 							printf "$crypted %-17s$offline" "$zfs_name / $zfs_vdev"
