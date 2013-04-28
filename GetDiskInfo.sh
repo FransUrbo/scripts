@@ -116,8 +116,8 @@ lspci -D | \
 				# ----------------------
 				# Get name
 				name=""
-				if echo "$t_id" | egrep -q "^[0-9]" -a type lsscsi > /dev/null 2>&1; then
-				    name=`lsscsi --device "$t_id" | sed -e 's@.*/@@' -e 's@\[.*@@'`
+				if echo "$t_id" | egrep -q "^[0-9]" -a && type lsscsi > /dev/null 2>&1; then
+                                    name=`lsscsi --device "$t_id" | sed -e 's@.*/@@' -e 's@ \[.*@@'`
 				fi
 				if [ -z "$name" -o "$name" == "-" ]; then
 				    # /sys/block/*/device | grep '/0000:05:00.0/host8/'
@@ -144,9 +144,9 @@ lspci -D | \
                                 # ... serial number
                                 if [ -b "/dev/$name" ]; then
                                     if type hdparm > /dev/null 2>&1; then
-                                        serial=`hdparm -I /dev/$name 2> /dev/null | \
-					    grep 'Serial Number:' | sed 's@.* @@'`
-                                    fi
+                                        set -- `hdparm -I /dev/$name 2> /dev/null | \
+                                            grep 'Serial Number:' | sed 's@Serial Number:@@'`
+                                        serial=$1                                    fi
                                 fi
                                 [ -z "$serial" ] && serial="n/a"
 
@@ -277,11 +277,10 @@ lspci -D | \
 				    # Get DM-CRYPT device mapper name
 				    if [ -n "$DO_DMCRYPT" -a -n "$DMCRYPT" ]; then
 					for dm_dev_name in $DMCRYPT; do
-					    set -- `echo $dm_dev_name | sed 's@:@ @'`
-					    dm_name=$1 ; dm_dev=$2
-
-					    echo "$DID" | grep -q "$dm_name" && dmcrypt=$dm_name
-					    [ "$name" == "$dm_dev" ] && dmcrypt=$dm_name
+                                            set -- `echo $dm_dev_name | sed 's@:@ @'`
+                                            dm_name=$1 ; dm_dev=`echo $2 |  sed -e 's@[0-9]@@'`
+                                            echo "$DID" | grep -q "$dm_dev" && dmcrypt=$dm_name
+                                            [ "$name" == "$dm_dev" ] && dmcrypt=$dm_name
 					done
                                         [ -z "$dmcrypt" ] && dmcrypt="n/a"
 				    fi
