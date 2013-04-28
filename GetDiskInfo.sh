@@ -39,7 +39,7 @@ if type cryptsetup > /dev/null 2>&1; then
     fi
 fi
 
-printf "  %-9s %-4s %-20s%-45s%-10s%-25s" "Host" "Name" "Model" "Device by ID" "Rev" "Serial"
+printf "  %-15s %-4s %-20s%-45s%-10s%-25s" "Host" "Name" "Model" "Device by ID" "Rev" "Serial"
 [ -n "$DO_MD" ] && printf "%-10s" "MD"
 [ -n "$DO_PVM" -a -f "$PVM_TEMP" ] && printf "%-10s" "VG"
 [ -n "$DO_DMCRYPT" -a -n "$DMCRYPT" ]  && printf "%-25s" "DM-CRYPT"
@@ -80,7 +80,7 @@ lspci -D | \
 			# Check again - look for the 'rev' file. 
 			blocks=`find $path/target*/[0-9]*/rev 2> /dev/null`
 			if [ -n "$blocks" ]; then
-			    blocks=`find $path/target*/[0-9]* -maxdepth 0`
+			    blocks=`find $path/target*/[0-9]* -maxdepth 0 | head -n1`
 			else
                             # Third check - catch the SAS2LP
                             ports=`find $path -maxdepth 2 -name 'port-*:?' -type d | head -n1`
@@ -109,7 +109,8 @@ lspci -D | \
 
 				if echo "$path" | egrep -q '/port-*:?'; then
                                     # path: '/sys/devices/pci0000:00/0000:00:0b.0/0000:03:00.0/host0/port-0:0/end_device-0:0/target0:0:0/0:0:0:0'
-                                    host=`echo "$path" | sed "s@.*/host.*/\(.*\)/end_.*@\1@"`
+                                    #host=`echo "$path" | sed "s@.*/host.*/\(.*\)/end_.*@\1@"` # TODO: Where did 'end_' come from!?
+				    host=`echo "$path" | sed "s@.*/host.*/\(.*\)/.*@\1@"`
                                 fi
 
 				# ----------------------
@@ -121,8 +122,7 @@ lspci -D | \
 				if [ -z "$name" -o "$name" == "-" ]; then
 				    # /sys/block/*/device | grep '/0000:05:00.0/host8/'
 				    name=`stat /sys/block/*/device | \
-					egrep "File: .*/$id.*$host/" | \
-					tail -n1 | \
+					egrep "File: .*/$id.*$host/.*$t_id" | \
 					sed -e "s@.*block/\(.*\)/device'.*@\1@" \
 				            -e 's@.*\!@@'`
 				    if [ -z "$name" ]; then
@@ -305,7 +305,7 @@ lspci -D | \
 
 				# ----------------------
 				# Output information
-				printf "  %-9s %-4s %-20s%-45s%-10s%-25s" \
+				printf "  %-15s %-4s %-20s%-45s%-10s%-25s" \
                                     $host $name "$model" "$DID" $rev $serial
                                 [ -n "$DO_MD" ] && printf "%-10s" "$md"
                                 [ -n "$DO_PVM" -a -f "$PVM_TEMP" ] && printf "%-10s" "$vg"
@@ -314,7 +314,7 @@ lspci -D | \
                                 printf "%8s\n" "$size"
 			    done # => 'while read block; do'
 		    else
-			printf "  %-9s n/a\n" $host
+			printf "  %-15s n/a\n" $host
 		    fi
 		done # => 'while read path; do'
 
