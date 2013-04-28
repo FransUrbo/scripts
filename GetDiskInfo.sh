@@ -2,14 +2,14 @@
 
 #ll /sys/bus/pci/devices/0000:0[2-4]:00.0/host*/target*/[0-9]*/block*
 
-DO_ZFS=0
+DO_ZFS=
 if type zpool > /dev/null 2>&1; then
     DO_ZFS=1
     ZFS_TEMP=`tempfile -d /tmp -p zfs.`
     zpool status > $ZFS_TEMP 2> /dev/null
 fi
 
-DO_PVM=0
+DO_PVM=
 if type pvs > /dev/null 2>&1; then
     DO_PVM=1
     PVM_TEMP=`tempfile -d /tmp -p pvm.`
@@ -18,7 +18,7 @@ if type pvs > /dev/null 2>&1; then
         2> /dev/null
 fi
 
-DO_MD=0
+DO_MD=
 [ -f "/proc/mdstat" ] && DO_MD=1
 
 printf "  %-9s %-4s %-20s%-45s%-10s%-25s" "Host" "Name" "Model" "Device by ID" "Rev" "Serial"
@@ -102,7 +102,8 @@ lspci -D | \
 				if [ -z "$name" -o "$name" == "-" ]; then
 				    # /sys/block/*/device | grep '/0000:05:00.0/host8/'
 				    name=`stat /sys/block/*/device | \
-					egrep "File: .*/$id.*$host" | \
+					egrep "File: .*/$id.*$host/" | \
+					tail -n1 | \
 					sed -e "s@.*block/\(.*\)/device'.*@\1@" \
 				            -e 's@.*\!@@'`
 				    if [ -z "$name" ]; then
@@ -242,13 +243,15 @@ lspci -D | \
 				    # ----------------------
 				    # Get size of disk
 				    if type fdisk > /dev/null 2>&1; then
-					size=`fdisk -l $dev_path 2> /dev/null | \
+					if [ -n "$dev_path" ]; then
+					    size=`fdisk -l $dev_path 2> /dev/null | \
 						grep '^Disk /' | \
 						sed -e "s@.*: \(.*\), .*@\1@" \
 						    -e 's@\.[0-9] @@'`
-					if echo "$size" | egrep -q '^[0-9][0-9][0-9][0-9]GB'; then
-					    s=`echo "$size" | sed 's@GB@@'`
-					    size=`echo "scale=2; $s / 1024" | bc`"TB"
+					    if echo "$size" | egrep -q '^[0-9][0-9][0-9][0-9]GB'; then
+						s=`echo "$size" | sed 's@GB@@'`
+						size=`echo "scale=2; $s / 1024" | bc`"TB"
+					    fi
 					fi
 				    fi
 				    [ -z "$size" ] && size="n/a"
