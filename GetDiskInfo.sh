@@ -116,8 +116,8 @@ lspci -D | \
 				# ----------------------
 				# Get name
 				name=""
-				if echo "$t_id" | egrep -q "^[0-9]" -a && type lsscsi > /dev/null 2>&1; then
-                                    name=`lsscsi --device "$t_id" | sed -e 's@.*/@@' -e 's@ \[.*@@'`
+				if echo "$t_id" | egrep -q "^[0-9]" -a type lsscsi > /dev/null 2>&1; then
+				    name=`lsscsi --device "$t_id" | sed -e 's@.*/@@' -e 's@ \[.*@@'`
 				fi
 				if [ -z "$name" -o "$name" == "-" ]; then
 				    # /sys/block/*/device | grep '/0000:05:00.0/host8/'
@@ -146,7 +146,8 @@ lspci -D | \
                                     if type hdparm > /dev/null 2>&1; then
                                         set -- `hdparm -I /dev/$name 2> /dev/null | \
                                             grep 'Serial Number:' | sed 's@Serial Number:@@'`
-                                        serial=$1                                    fi
+                                        serial=$1
+				    fi
                                 fi
                                 [ -z "$serial" ] && serial="n/a"
 
