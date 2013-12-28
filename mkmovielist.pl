@@ -1,5 +1,11 @@
 #!/usr/bin/perl -w
 
+# NOTE:
+# Requires imdbmoviefetcher v4.2.
+# http://sourceforge.net/projects/imdbmoviefetche/files/
+
+require "/share/.Torrents/Unsorted/.mkmovies2mysql_includes.pl";
+
 $ZFS_SHARE = "share/Movies";
 $ZFS_SHARE_ADDITIONAL = "share/TV_Series";
 $TV_SERIES_MATCH = 'TV_Series';
@@ -62,54 +68,67 @@ sub get_size() {
 
 # --------------------------------------------
 sub update_list() {
-    my($string) = @_;
+    my($fh, $string) = @_;
     my($line);
 
     my $name_out = (split(';', $string))[1];
-
-    open(LIST, "> .mkmovielist.list.new")
-	|| die("Can't create new/temp list of movies, $!\n");
 
     for my $line (sort keys %MOVIES) {
 	my $name_in = (split(';', $line))[1];
 
 	if($name_in eq $name_out) {
 	    # Print new line
-	    print LIST "$string\n";
+	    print $fh "$string\n";
 	} else {
-	    print LIST "$line\n";
+	    print $fh "$line\n";
 	}
     }
-
-    close(LIST);
 }
 
 # --------------------------------------------
 sub translate_string() {
     my($string) = @_;
 
-    $string =~ s/&#27;//i;
-    $string =~ s/&#x27//i;
-
-    $string =~ s/&#39;/\'/i;
-    $string =~ s/&#x39/\'/i;
-
-    $string =~ s/\&eacute;/e/i;
-    $string =~ s/\&aacute;/a/i;
-    $string =~ s/\&iacute;/i/i;
-    $string =~ s/\&oacute;/o/i;
-    $string =~ s/\&ntilde;/n/i;
-    $string =~ s/\&nbsp;/ /i;
-    $string =~ s/\&raquo;/r/i;
-    $string =~ s/\&ouml;/o/i;
-    $string =~ s/\&euml;/e/i;
-    $string =~ s/\&auml;/a/i;
-    $string =~ s/\&uuml;/u/i;
-    $string =~ s/\&aring;/a/i;
-    $string =~ s/\&oring;/o/i;
-    $string =~ s/\&oslash;/?/i;
-
     $string =~ s/([^\x20-\x7E])/sprintf("&#x%X;", ord($1))/eg;
+
+    $string =~ s/&#x27//ig;
+    $string =~ s/&#x39/\'/ig;
+    $string =~ s/&#x81/A/ig;
+    $string =~ s/&#x84/o/ig;
+    $string =~ s/&#x89/E/ig;
+    $string =~ s/&#x93/O/ig;
+    $string =~ s/&#xA1;/a/ig;
+    $string =~ s/&#xA4;/a/ig;
+    $string =~ s/&#xA6;/e/ig;
+    $string =~ s/&#xA5;/a/ig;
+    $string =~ s/&#xA7;/c/ig;
+    $string =~ s/&#xA8;/e/ig;
+    $string =~ s/&#xA9;/e/ig;
+    $string =~ s/&#xAB;/e/ig;
+    $string =~ s/&#xAD;//ig;
+    $string =~ s/&#xB1;/n/ig;
+    $string =~ s/&#xB3;/e/ig;
+    $string =~ s/&#xB4;//ig;
+    $string =~ s/&#xB6;/o/ig;
+    $string =~ s/&#xB8;/oe/ig;
+    $string =~ s/&#xBB;/u/ig;
+    $string =~ s/&#xBC;/u/ig;
+    $string =~ s/&#xC3;/a/ig;
+
+    $string =~ s/&eacute;/e/i;
+    $string =~ s/&aacute;/a/i;
+    $string =~ s/&iacute;/i/i;
+    $string =~ s/&oacute;/o/i;
+    $string =~ s/&ntilde;/n/i;
+    $string =~ s/&nbsp;/ /i;
+    $string =~ s/&raquo;/r/i;
+    $string =~ s/&ouml;/o/i;
+    $string =~ s/&euml;/e/i;
+    $string =~ s/&auml;/a/i;
+    $string =~ s/&uuml;/u/i;
+    $string =~ s/&aring;/a/i;
+    $string =~ s/&oring;/o/i;
+    $string =~ s/&oslash;/?/i;
 
 #    my $fixed = "";
 #    my @chars = split //, $string;
@@ -129,88 +148,74 @@ sub translate_string() {
 # --------------------------------------------
 sub imdb_lookup() {
     my($title, $cnt) = @_;
-    my($line, $imdb_title, $data, $year, $genres, $casts, $directors, $plot, $url);
+    my($tmp, $line, $imdb_title, $data, $year, $genres, $casts, $directors, $plot, $url);
 
     $cnt = 0 if(!$cnt);
     return '' if($cnt >= 2);
 
     print "lookup {$title} ";
 
-    open(IMDB, "/usr/local/bin/imdb-mf -t \"$title\" |")
+    # Just need the imdb ID so we can create a URL to the IMDB page
+    if(!open(IMDB, "/usr/local/IMDbPY/bin/search_movie.py \"$title\" |")) {
+	print "Can't fetch from IMDB (1), $!\n";
+	return '';
+    }
+    $line = <IMDB>; $line = <IMDB>; $line = <IMDB>;
+    if($line) {
+	chomp($line); # First actuall match
+	close(IMDB);
+	$tmp = (split('	: ', $line))[0];
+	$url = "http://www.imdb.com/title/tt$tmp/";
+    }
+
+    open(IMDB, "/usr/local/IMDbPY/bin/get_first_movie.py \"$title\" |")
 	|| die("Can't fetch from IMDB, $!\n");
     while(! eof(IMDB)) {
 	$line = <IMDB>;
 	chomp($line);
+	$line =~ s/\.$//;
 
-	$data =  $line;
-	$data =~ s/.* ://;
-	$data =~ s/^ //;
-	$data = &translate_string($data);
+#	$data = &translate_string($line);
 
-	if($line =~ /^Title .*:/) {
-	    $imdb_title = $data;
-	    $imdb_title =~ s/([a-z]): /$1 - /;
-	} elsif($line =~ /^Year .*:/) {
-	    if($title =~ /^[0-9][0-9][0-9][0-9] /) {
-		# Special case - bug in imdb-mf: Actual year is on next line
-		$line = <IMDB>;
-		chomp($line);
-
-		$data = $line;
-	    }
-	    $year = $data;
-
+	if($line =~ /^Title: /) {
+	    $tmp = $line;
+	    $tmp =~ s/^Title: (.*) \(([0-9].*[0-9])\).*$/$1;$2/;
+	    ($imdb_title, $year) = split(';', $tmp);
 	    $YEARS{$year} = $year;
-	} elsif($line =~ /^Cast .*:/) {
-	    $data =~ s/ and /, /;
-	    $data =~ s/ $//;
 
-	    $casts = $data;
+	} elsif($line =~ /^Cast: /) {
+	    $casts = $line;
+	    $casts =~ s/^Cast: //;
 
 	    @casts = split(', ', $casts);
 	    for my $cast (@casts) {
 		$CASTS{$cast} = $cast;
 	    }
-	} elsif($line =~ /^Genres .*:/) {
-	    $data =~ s/ and /, /;
-	    $data =~ s/ $//;
-
-	    $genres = $data;
+	} elsif($line =~ /^Genres: /) {
+	    $genres = $line;
+	    $genres =~ s/^Genres: //;
 
 	    @genres = split(', ', $genres);
 	    for my $genre (@genres) {
 		$GENRES{$genre} = $genre;
 	    }
-	} elsif($line =~ /^Director .*:/) {
-	    $data =~ s/ and /, /;
-	    $data =~ s/   .*//;
-	    $data =~ s/ $//;
-
-	    $directors = $data;
+	} elsif($line =~ /^Director: /) {
+	    $directors = $line;
+	    $directors =~ s/^Director: //;
 
 	    @directors = split(', ', $directors);
 	    for my $director (@directors) {
 		$DIRECTORS{$director} = $director;
 	    }
-	} elsif($line =~ /^Plot .*:/) {
-	    $line = <IMDB>;
-
-	    $data = '';
-	    while(($line = <IMDB>) !~ /^$/) {
-		chomp($line);
-
-		$data .= $line; #."<br>";
-	    }
-
-	    $plot = $data;
-	} elsif($line =~ /^IMDB movie URL/) {
-	    $url =  $data;
-	    last;
+	} elsif($line =~ /^Plot: /) {
+	    $plot = $line;
+	    $plot =~ s/^Plot: //;
+	    
 	}
     }
     close(IMDB);
 
-    if($url !~ /^http:/) {
+    if($url && $url !~ /^http:/) {
 	# Try again, with slightly modified title...
 	$title =~ s/.*\ -\ //;
 	($imdb_title, $year, $genres, $casts, $directors, $url, $plot) = &imdb_lookup($title, $cnt+1);
@@ -254,7 +259,7 @@ if(open(LIST, ".mkmovielist.list")) {
 	chomp($line);
 	
 	my $name = (split(';', $line))[1];
-	$MOVIES{"$name"} = $line;
+	$MOVIES{"$name"} = $line if($name);
     }
     close(LIST);
 } else {
@@ -264,7 +269,7 @@ if(open(LIST, ".mkmovielist.list")) {
 # --------------------------------------------
 $movie_nr = 1;
 
-open(FS, "zfs list -H -r '$ZFS_SHARE' '$ZFS_SHARE_ADDITIONAL' -o mountpoint 2> /dev/null | sort |")
+open(FS, "sudo zfs list -H -r '$ZFS_SHARE' '$ZFS_SHARE_ADDITIONAL' -o mountpoint 2> /dev/null | sort |")
     || die("Can't open ZFS shares list, $!\n");
 while(! eof(FS)) {
     my $fs = <FS>;
@@ -278,18 +283,21 @@ while(! eof(FS)) {
 	$wild = '';
     }
 
-    open(FIND, "find \"$fs\"$wild -maxdepth 1 -type $type | ")
+#    open(FIND, "find \"$fs\"$wild -maxdepth 1 -type $type | ")
+    open(FIND, "find \"$fs\"$wild -mount -type $type | ")
 	|| die("Can't run find, $!\n");
     while(! eof(FIND)) {
 	my $file = <FIND>;
 	chomp($file);
 
+	# NOTE: Filename including path.
 	# Remove crap we're not interested in anyway.
 	next if(($file =~ /\.zfs$/i) ||
 		($file =~ /\.srt$/i) ||
 		($file =~ /\.idx$/i) ||
 		($file =~ /\.sub$/i) ||
 		($file =~ /\.jpg$/i) ||
+		($file =~ /\.png$/i) ||
 		($file =~ /\.txt$/i) ||
 		($file =~ /\.rar$/i) ||
 		($file =~ /\.log$/i) ||
@@ -299,6 +307,7 @@ while(! eof(FS)) {
 		($file =~ /\.mss$/i) ||
 		($file =~ /\.bup$/i) ||
 		($file =~ /\.mpg$/i) ||
+		($file =~ /\.db$/i) ||
 
 		($file =~ / - [2-9]\./) ||
 		($file =~ / - CD[2-9]\./) ||
@@ -309,6 +318,7 @@ while(! eof(FS)) {
 		($file =~ /Clips/i) ||
 		($file =~ /\.Apple/) ||
 
+		($file =~ /Behind The Scenes/i) ||
 		($file =~ /Commercials/) ||
 		($file =~ /Parent/) ||
 		($file =~ /volinfo/) ||
@@ -332,6 +342,7 @@ while(! eof(FS)) {
 	}
 
 	# --------------------------------------------
+	# NOTE: Movie title. 
 	my $name = $file;
 	$name =~ s/.*\///;
 	$name =~ s/ - 1[xX][0-9][0-9]//;
@@ -363,6 +374,7 @@ while(! eof(FS)) {
 	$title =~ s/ \(SvensktTal\)//i;
 	$title =~ s/ \(MultiSubs-PAL\)//i;
 	$title =~ s/ \(Unrated\)//i;
+	$name =~ s/ \(Part [0-9]\)//;
 
 	$title =~ s/Disney\'s //;
 	$title =~ s/ ([12][90][0-9][0-9])/ \($1\)/;
@@ -402,13 +414,21 @@ while(! eof(FS)) {
 		    if($UPDATE_LIST) {
 			print "FOUND:UPDATE";
 
-			&update_list("$file;$name;$title;$url;$year;$genres;$casts;$directors;$plot");
+			open(LIST, "> .mkmovielist.list.new")
+			    || die("Can't create new/temp list of movies, $!\n");
+			&update_list(LIST, "$file;$name;$title;$url;$year;$genres;$casts;$directors;$plot");
+			close(LIST);
 		    } else {
 			print "FOUND:NEW";
 
 			open(LIST, ">> .mkmovielist.list")
-			    || die("Can't append to existing list of movies, $!\n");
+			    || die("Can't append to existing list of movies (txt), $!\n");
 			print LIST "$file;$name;$title;$url;$year;$genres;$casts;$directors;$plot\n";
+			close(LIST);
+
+			open(LIST, ">> .mkmovielist.list.sql")
+			    || die("Can't append to existing list of movies (sql), $!\n");
+			&mysql_insert(LIST, $file, $name, $title, $url, $year, $genres, $casts, $directors, $plot);
 			close(LIST);
 		    }
 		} else {
@@ -528,14 +548,11 @@ for my $entry (sort keys %ENTRIES) {
     $name  =~ s/&#xC3;&#xB6;/ö/;
     $name  =~ s/&#xCC;&#x88;/ä/;
 
-    $casts =~ s/ \| See full cast and crew//i;
-
     $plot  =~ s/([^\x20-\x7E])/sprintf("&#x%X;", ord($1))/eg;
     $plot  =~ s/&#x27//g;
     $plot  =~ s/\"/\'/g;
     $plot  =~ s/\<br\>/ /g;
     $plot  =~ s/ \& / and /g;
-    $plot  =~ s/ See full synopsis.*//;
 
     $url_plot  = "$file&#10;&#13;".$plot;
 
