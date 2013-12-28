@@ -1,0 +1,69 @@
+#!/bin/sh
+
+if [ ! -d "/home/ftp/debian/debian" ]; then
+    echo "~ftp/debian/debian does not exist."
+    exit 1
+fi
+
+TEMP=`getopt -o v --long progress -- "$@"`
+eval set -- "$TEMP"
+while true; do
+    case "$1" in
+        -v|--progress)
+            PROGRESS="--progress"
+            shift
+            ;;
+        --)
+            break
+            ;;
+        *)
+            echo "Internal error!"
+            exit 1
+            ;;
+    esac
+done
+
+ARCH="i386,amd64" # kfreebsd-amd64,kfreebsd-i386,sparc,powerpc
+OPTS="--method=ftp --nosource --ignore-release-gpg --pdiff=none"
+OPTS="$OPTS --host=ftp.se.debian.org --arch=$ARCH $PROGRESS"
+
+# =================================================================================
+
+# Last two stable + unstable	 http://ftp.se.debian.org/mirror/debian/
+DIR=debian
+DISTS="squeeze,squeeze-proposed-updates,squeeze-updates"
+DISTS="$DISTS,wheezy,wheezy-proposed-updates,wheezy-updates,wheezy-backports"
+DISTS="$DISTS,jessie,jessie-proposed-updates,jessie-updates,jessie-backports"
+DISTS="$DISTS,sid"
+debmirror $OPTS --root=/mirror/$DIR --dist=$DISTS ~ftp/debian/$DIR
+
+# =================================================================================
+
+# Old redacted versions		http://ftp.se.debian.org/mirror/debian-archive/
+DIR=debian-archive
+DISTS="bo,buzz,etch,etch-m68k,hamm,hamm-proposed-updates,lenny,potato"
+DISTS="$DISTS,potato-proposed-updates,rex,sarge,sarge-proposed-updates"
+DISTS="$DISTS,slink,slink-proposed-updates,woody"
+debmirror $OPTS --root=/mirror/$DIR --dist=$DISTS ~ftp/debian/$DIR
+	
+
+# =================================================================================
+
+# Non US			http://ftp.se.debian.org/mirror/debian-non-US/
+DIR=debian-non-US
+DISTS="woody,woody-proposed-updates,slink,slink-proposed-updates"
+DISTS="$DISTS,sarge,potato,potato-proposed-updates"
+debmirror $OPTS --root=/mirror/$DIR --dist=$DISTS ~ftp/debian/debian-archive-nonus
+
+# =================================================================================
+
+# All Ubuntu versions		http://ftp.se.debian.org/mirror/ubuntu/
+DIR=/ubuntu
+DISTS="lucid,lucid-proposed,lucid-security,lucid-updates,lucid-backports"
+DISTS="$DISTS,precise,precise-proposed,precise-security,precise-updates,precise-backports"
+DISTS="$DISTS,oneiric,oneiric-updates,oneiric-security,oneiric-proposed,oneiric-backports"
+DISTS="$DISTS,quantal,quantal-updates,quantal-security,quantal-proposed,quantal-backports"
+DISTS="$DISTS,raring,raring-updates,raring-security,raring-proposed,raring-backports"
+DISTS="$DISTS,saucy,saucy-updates,saucy-security,saucy-proposed,saucy-backports"
+DISTS="$DISTS,trusty,trusty-updates,trusty-security,trusty-proposed,trusty-backports"
+#debmirror $OPTS --root=$DIR --dist=$DISTS ~ftp/ubuntu/ubuntu
