@@ -73,6 +73,10 @@ lspci -D | \
 		    # Get HOST ID
 		    host=`echo "$path" | sed 's@.*/@@'`
 
+		    got_hosts=`find "$path/.." -maxdepth 1 -type d -name 'host*'`
+		    chk_ata=`echo "$host" | grep ^ata`
+		    [ -n "$got_hosts" -a -n "$chk_ata" ] && continue
+
 		    # ----------------------
 		    # Get block path
 		    blocks=`find $path/[0-9]*/block*/* -maxdepth 0 2> /dev/null`
@@ -122,7 +126,7 @@ lspci -D | \
 				if [ -z "$name" -o "$name" == "-" ]; then
 				    # /sys/block/*/device | grep '/0000:05:00.0/host8/'
 				    name=`stat /sys/block/*/device | \
-					egrep "File: .*/$id.*$host/.*$t_id" | \
+					egrep "File: .*/$id.*$host/.*$t_id|File: .*/$t_id" | \
 					sed -e "s@.*block/\(.*\)/device'.*@\1@" \
 				            -e 's@.*\!@@'`
 				    if [ -z "$name" ]; then
@@ -162,13 +166,13 @@ lspci -D | \
 					    # md3 sdg1[0] sdb1[1]
 					    set -- `echo "$MD"`
 					    for dev in $*; do
-						if echo "$dev" | grep -q "^$name[0-9]"; then
+						if echo "$dev" | grep -q "^$name"; then
 						    md="$1"
 						    break
 						fi
 					    done
 					fi
-                                        [ -z "$md" ] && md="n/a"
+					[ -z "$md" ] && md="n/a"
 				    fi
 
 				    # ----------------------
@@ -271,6 +275,10 @@ lspci -D | \
 						    echo "$pvs" | sed "s@.*,\(.*\),lvm.*@\1@"
 						fi
 					    done)
+                                        if [ -z "$vg" ]; then
+					    # Double check - is it mounted
+					    vg=`mount | grep "/$md" | sed "s@.* on \(.*\) type.*@\1@"`
+					fi					    
                                         [ -z "$vg" ] && vg="n/a"
 				    fi
 
@@ -288,7 +296,7 @@ lspci -D | \
 
 				    # ----------------------
 				    # Get size of disk
-				    if type fdisk > /dev/null 2>&1; then
+				    if type fdisk > /dev/null 2>&1 && type bc > /dev/null 2>&1; then
 					if [ -n "$dev_path" ]; then
 					    size=`fdisk -l $dev_path 2> /dev/null | \
 						grep '^Disk /' | \
