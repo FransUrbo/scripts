@@ -39,7 +39,7 @@ if type cryptsetup > /dev/null 2>&1; then
     fi
 fi
 
-printf "  %-15s %-4s %-20s%-45s%-10s%-25s" "Host" "Name" "Model" "Device by ID" "Rev" "Serial"
+printf "  %-15s %-4s %-20s%-45s%-10s%-25s%-10s" "Host" "Name" "Model" "Device by ID" "Rev" "Serial" "Warranty"
 [ -n "$DO_MD" ] && printf "%-10s" "MD"
 [ -n "$DO_PVM" -a -f "$PVM_TEMP" ] && printf "%-10s" "VG"
 [ -n "$DO_DMCRYPT" -a -n "$DMCRYPT" ]  && printf "%-25s" "DM-CRYPT"
@@ -136,7 +136,7 @@ lspci -D | \
                                 dev_path=`find /dev -name "$name" -type b`
 
 				# ... model
-				model=`cat "$path/model" | sed 's@-.*@@'`
+				model=`cat "$path/model" | sed -e 's@-.*@@' -e 's/ *$//g'`
 
 				# ... and revision
 				if [ -f "$path/rev" ]; then
@@ -312,9 +312,30 @@ lspci -D | \
 				fi
 
 				# ----------------------
+                                # Get warranty information
+                                # Columns: Model, Serial, Rev, Warranty, Device separated
+                                # by tabs.
+                                if [ -f ~/.disks_serial+warranty ]; then
+                                    if echo "$model" | grep -q " "; then
+                                        tmpmodel=`echo "$model" | sed 's@ @@g'`
+                                    else
+                                        tmpmodel="$model"
+                                    fi
+
+                                    set -- `egrep -w "^$tmpmodel.*$serial" ~/.disks_serial+warranty`
+                                    if [ -n "$4" ]; then
+                                        warranty=$4
+                                    else
+                                        warranty=n/a
+                                    fi
+                                else
+                                    warranty=n/a
+                                fi
+
+				# ----------------------
 				# Output information
-				printf "  %-15s %-4s %-20s%-45s%-10s%-25s" \
-                                    $host $name "$model" "$DID" $rev $serial
+				printf "  %-15s %-4s %-20s%-45s%-10s%-25s%-10s" \
+                                    $host $name "$model" "$DID" $rev "$serial" "$warranty"
                                 [ -n "$DO_MD" ] && printf "%-10s" "$md"
                                 [ -n "$DO_PVM" -a -f "$PVM_TEMP" ] && printf "%-10s" "$vg"
                                 [ -n "$DO_DMCRYPT" -a -n "$DMCRYPT" ] && printf "%-25s" "$dmcrypt"
