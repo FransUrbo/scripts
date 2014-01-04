@@ -43,7 +43,7 @@ printf "  %-15s %-4s %-20s%-45s%-10s%-25s%-10s" "Host" "Name" "Model" "Device by
 [ -n "$DO_MD" ] && printf "%-10s" "MD"
 [ -n "$DO_PVM" -a -f "$PVM_TEMP" ] && printf "%-10s" "VG"
 [ -n "$DO_DMCRYPT" -a -n "$DMCRYPT" ]  && printf "%-25s" "DM-CRYPT"
-[ -n "$DO_ZFS" -a -f "$ZFS_TEMP" ] && printf "%-25s" "    ZFS"
+[ -n "$DO_ZFS" -a -f "$ZFS_TEMP" ] && printf "%-30s" "    ZFS"
 printf "  %8s\n\n" "Size"
 
 lspci -D | \
@@ -70,8 +70,12 @@ lspci -D | \
 		sed 's@.*;@@' | \
 		while read path; do
 		    # ----------------------
-		    # Get HOST ID
-		    host=`echo "$path" | sed 's@.*/@@'`
+		    # Get HOST name
+		    if [ -d $path/host? ]; then
+                        host=`echo $path/host? | sed 's@.*/@@'`
+                    else
+		        host=`echo "$path" | sed 's@.*/@@'`
+                    fi
 
 		    got_hosts=`find "$path/.." -maxdepth 1 -type d -name 'host*'`
 		    chk_ata=`echo "$host" | grep ^ata`
@@ -113,8 +117,7 @@ lspci -D | \
 
 				if echo "$path" | egrep -q '/port-*:?'; then
                                     # path: '/sys/devices/pci0000:00/0000:00:0b.0/0000:03:00.0/host0/port-0:0/end_device-0:0/target0:0:0/0:0:0:0'
-                                    #host=`echo "$path" | sed "s@.*/host.*/\(.*\)/end_.*@\1@"` # TODO: Where did 'end_' come from!?
-				    host=`echo "$path" | sed "s@.*/host.*/\(.*\)/.*@\1@"`
+                                    host=`echo "$path" | sed "s@.*/.*\(host[0-9]\+\)/.*port-\([0-9]\+\):.*@\1:\2@"`
                                 fi
 
 				# ----------------------
@@ -196,7 +199,8 @@ lspci -D | \
 				    if [ -n "$DO_ZFS" -a -f "$ZFS_TEMP" ]; then
 					# OID: SATA_Corsair_Force_311486508000008952122
 					# ZFS: ata-Corsair_Force_3_SSD_11486508000008952122
-					tmpnam=`echo "$DID" | sed "s@SATA_\(.*_.*\)_[0-9].*@\1@"`
+					#tmpnam=`echo "$DID" | sed "s@SATA_\(.*_.*\)_[0-9].*@\1@"`
+                                        tmpnam=`echo "$DID" | sed "s@SATA_@@"`
 
                                         # Setup a matching string.
                                         # egrep matches _every line_ if 'NULL|sda|NULL'!
@@ -223,6 +227,9 @@ lspci -D | \
 						fi
 					    done
 					fi
+                                        if [ -n "$model" -a -n "$serial" ]; then
+                                            zfs_regexp="$zfs_regexp|$model-.*_$serial"
+                                        fi
 
 					zfs=$(cat $ZFS_TEMP | 
 					    while read zpool; do
@@ -234,32 +241,56 @@ lspci -D | \
 						    shift ; shift ; shift ; shift ; shift
 						elif echo "$zpool" | egrep -q '^raid|^mirror|^cache|^spare'; then
 						    zfs_vdev=`echo "$zpool" | sed 's@ .*@@'`
+                                                elif echo "$zpool" | grep -q 'replacing'; then
+                                                    replacing="rpl"`echo "$zpool" | sed "s@.*-\([0-9]\+\) .*@\1@"`
+                                                    ii=1
 						elif echo "$zpool" | egrep -q "$zfs_regexp"; then
 						    if ! echo "$zpool" | egrep -q "ONLINE|AVAIL"; then
 							offline="!"
 							if echo "$zpool" | grep -q "OFFLINE"; then
 							    offline="$offline"O
+                                                            offline_type=O
 							elif echo "$zpool" | grep -q "UNAVAIL"; then
 							    offline="$offline"U
+                                                            offline_type=U
 							elif echo "$zpool" | grep -q "FAULTED"; then
 							    offline="$offline"F
+                                                            offline_type=F
 							elif echo "$zpool" | grep -q "REMOVED"; then
 							    offline="$offline"R
+                                                            offline_type=R
 							fi
                                                     elif echo "$zpool" | grep -q "resilvering"; then
-                                                        offline=" "rs
+                                                        offline="$offline"rs
+                                                        resilvering=1
 						    fi
 
                                                     if [ -n "$DO_DMCRYPT" -a -n "$DMCRYPT" ]; then
                                                         if echo "$zpool" | egrep -q "$tmpdmname"; then
                                                             crypted="*"
+                                                            have_dmcrypted=1
                                                         fi
                                                     fi
 
+                                                    if [ -n "$replacing" -a -n "$offline" ]; then
+                                                        stat="$replacing"+"$offline"
+                                                    elif [ -n "$replacing" -a -z "$offline" ]; then
+                                                        stat="$replacing"
+                                                    elif [ -z "$replacing" -a -n "$offline" ]; then
+                                                        stat="$offline"
+                                                    fi
+
 						    if [ "x$zfs_name" != "" -a "$zfs_vdev" != "" ]; then
-							printf "$crypted %-17s$offline" "$zfs_name / $zfs_vdev"
+							printf "$crypted %-17s$stat" "$zfs_name / $zfs_vdev"
 						    fi
 						fi
+
+                                                if [ "$ii" == 3 ]; then
+                                                    replacing=""
+                                                    ii=0
+                                                else
+                                                    ii=`expr $ii + 1`
+                                                fi
 					    done)
 					[ -z "$zfs" ] && zfs="  n/a"
 				    fi
@@ -324,12 +355,12 @@ lspci -D | \
 
                                     set -- `egrep -w "^$tmpmodel.*$serial" ~/.disks_serial+warranty`
                                     if [ -n "$4" ]; then
-                                        warranty=$4
+                                        warranty="$4"
                                     else
-                                        warranty=n/a
+                                        warranty="n/a"
                                     fi
                                 else
-                                    warranty=n/a
+                                    warranty="n/a"
                                 fi
 
 				# ----------------------
@@ -339,7 +370,7 @@ lspci -D | \
                                 [ -n "$DO_MD" ] && printf "%-10s" "$md"
                                 [ -n "$DO_PVM" -a -f "$PVM_TEMP" ] && printf "%-10s" "$vg"
                                 [ -n "$DO_DMCRYPT" -a -n "$DMCRYPT" ] && printf "%-25s" "$dmcrypt"
-                                [ -n "$DO_ZFS" -a -f "$ZFS_TEMP" ] && printf "  %-25s" "$zfs"
+                                [ -n "$DO_ZFS" -a -f "$ZFS_TEMP" ] && printf "  %-30s" "$zfs"
                                 printf "%8s\n" "$size"
 			    done # => 'while read block; do'
 		    else
@@ -350,6 +381,12 @@ lspci -D | \
         echo
     done
 
-[ -n "$DO_DMCRYPT" ] && echo "* => is a dm-crypt device"
+[ -n "$have_dmcrypted" ] && echo "*  => is a dm-crypt device"
+[ -n "$resilvering" ] && echo "rs => Resilvering"
+[ "$offline_type" == "O" ] && echo "O  => Offline"
+[ "$offline_type" == "U" ] && echo "U  => Unavail"
+[ "$offline_type" == "F" ] && echo "F  => Faulted"
+[ "$offline_type" == "R" ] && echo "R  => Removed"
+
 [ -n "$ZFS_TEMP" ] && rm -f $ZFS_TEMP
 [ -n "$PVM_TEMP" ] && rm -f $PVM_TEMP
