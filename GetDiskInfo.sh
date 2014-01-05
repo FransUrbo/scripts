@@ -39,11 +39,38 @@ if type cryptsetup > /dev/null 2>&1; then
     fi
 fi
 
-printf "  %-15s %-4s %-20s%-45s%-10s%-25s%-10s" "Host" "Name" "Model" "Device by ID" "Rev" "Serial" "Warranty"
-[ -n "$DO_MD" ] && printf "%-10s" "MD"
-[ -n "$DO_PVM" -a -f "$PVM_TEMP" ] && printf "%-10s" "VG"
-[ -n "$DO_DMCRYPT" -a -n "$DMCRYPT" ]  && printf "%-25s" "DM-CRYPT"
-[ -n "$DO_ZFS" -a -f "$ZFS_TEMP" ] && printf "%-30s" "    ZFS"
+DO_WARRANTY=1 ; DO_REV=1
+
+# --------------
+# Get the CLI options - override DO_* above...
+TEMP=`getopt -o h --long no-zfs,no-pvm,no-md,no-dmcrypt,no-warranty,no-rev,help -- "$@"`
+eval set -- "$TEMP"
+while true ; do
+    case "$1" in
+        --no-zfs)	DO_ZFS=0	; shift ;;
+        --no-pvm)	DO_PVM=0	; shift ;;
+        --no-md)	DO_MD=0		; shift ;;
+        --no-dmcrypt)	DO_DMCRYPT=0	; shift ;;
+        --no-warranty)	DO_WARRANTY=0	; shift ;;
+        --no-rev)	DO_REV=0	; shift ;;
+        --help)
+	    echo "Usage: `basename $0` [--no-zfs|--no-pvm|--no-md|--no-dmcrypt]"
+            echo
+            exit 0
+            ;;
+	--)		shift ; break ;;
+	*)		echo "Internal error!"	; exit 1 ;;
+    esac
+done
+
+printf "  %-15s %-4s %-20s%-45s" "Host" "Name" "Model" "Device by ID"
+[ "$DO_REV" == 1 ] && printf "%-10s" "Rev"
+printf "%-25s" "Serial"
+[ "$DO_WARRANTY" == 1 ] && printf "%-10s" "Warranty"
+[ "$DO_MD" == 1 ] && printf "%-10s" "MD"
+[ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && printf "%-10s" "VG"
+[ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]  && printf "%-25s" "DM-CRYPT"
+[ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "%-30s" "    ZFS"
 printf "  %8s\n\n" "Size"
 
 lspci -D | \
@@ -142,11 +169,13 @@ lspci -D | \
 				model=`cat "$path/model" | sed -e 's@-.*@@' -e 's/ *$//g'`
 
 				# ... and revision
-				if [ -f "$path/rev" ]; then
-				    rev="`cat \"$path/rev\"`"
-				else
-				    rev="n/a"
-				fi
+                                if [ "$DO_REV" == 1 ]; then
+				    if [ -f "$path/rev" ]; then
+				        rev="`cat \"$path/rev\"`"
+				    else
+				        rev="n/a"
+				    fi
+                                fi
 
                                 # ... serial number
                                 if [ -b "/dev/$name" ]; then
@@ -162,7 +191,7 @@ lspci -D | \
 				DID="n/a"
 				if [ -n "$name" -a "$name" != "n/a" ]; then
 				    # ----------------------
-				    if [ -n "$DO_MD" ]; then
+				    if [ "$DO_MD" == 1 ]; then
 					# Get MD device
 					MD=`grep $name /proc/mdstat | sed 's@: active raid1 @@'`
 					if [ -n "$MD" ]; then
@@ -196,7 +225,7 @@ lspci -D | \
 
 				    # ----------------------
 				    # Get ZFS pool data for this disk ID
-				    if [ -n "$DO_ZFS" -a -f "$ZFS_TEMP" ]; then
+				    if [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ]; then
 					# OID: SATA_Corsair_Force_311486508000008952122
 					# ZFS: ata-Corsair_Force_3_SSD_11486508000008952122
 					#tmpnam=`echo "$DID" | sed "s@SATA_\(.*_.*\)_[0-9].*@\1@"`
@@ -219,7 +248,7 @@ lspci -D | \
                                                 zfs_regexp="$tmpnam"
                                             fi
                                         fi
-					if [ -n "$DO_DMCRYPT" -a -n "$DMCRYPT" ]; then
+					if [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]; then
 					    for dm_dev_name in $DMCRYPT; do
 						if echo $dm_dev_name | grep -q ":$name"; then
 						    tmpdmname=`echo "$dm_dev_name" | sed 's@:.*@@'`
@@ -265,7 +294,7 @@ lspci -D | \
                                                         resilvering=1
 						    fi
 
-                                                    if [ -n "$DO_DMCRYPT" -a -n "$DMCRYPT" ]; then
+                                                    if [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]; then
                                                         if echo "$zpool" | egrep -q "$tmpdmname"; then
                                                             crypted="*"
                                                             have_dmcrypted=1
@@ -299,7 +328,7 @@ lspci -D | \
 				    # Get LVM data (VG - Virtual Group) for this disk
 				    lvm_regexp="/$name"
 				    [ -n "$md" -a "$md" != "n/a" ] && lvm_regexp="$lvm_regexp|$md"
-				    if [ -n "$DO_PVM" -a -f "$PVM_TEMP" ]; then
+				    if [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ]; then
 					vg=$(cat $PVM_TEMP |
 					    while read pvs; do
 						if echo "$pvs" | egrep -q "$lvm_regexp"; then
@@ -315,7 +344,7 @@ lspci -D | \
 
 				    # ----------------------
 				    # Get DM-CRYPT device mapper name
-				    if [ -n "$DO_DMCRYPT" -a -n "$DMCRYPT" ]; then
+				    if [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]; then
 					for dm_dev_name in $DMCRYPT; do
                                             set -- `echo $dm_dev_name | sed 's@:@ @'`
                                             dm_name=$1 ; dm_dev=`echo $2 |  sed -e 's@[0-9]@@'`
@@ -346,7 +375,7 @@ lspci -D | \
                                 # Get warranty information
                                 # Columns: Model, Serial, Rev, Warranty, Device separated
                                 # by tabs.
-                                if [ -f ~/.disks_serial+warranty ]; then
+                                if [ "$DO_WARRANTY" == 1 -a -f ~/.disks_serial+warranty ]; then
                                     if echo "$model" | grep -q " "; then
                                         tmpmodel=`echo "$model" | sed 's@ @@g'`
                                     else
@@ -365,12 +394,14 @@ lspci -D | \
 
 				# ----------------------
 				# Output information
-				printf "  %-15s %-4s %-20s%-45s%-10s%-25s%-10s" \
-                                    $host $name "$model" "$DID" $rev "$serial" "$warranty"
-                                [ -n "$DO_MD" ] && printf "%-10s" "$md"
-                                [ -n "$DO_PVM" -a -f "$PVM_TEMP" ] && printf "%-10s" "$vg"
-                                [ -n "$DO_DMCRYPT" -a -n "$DMCRYPT" ] && printf "%-25s" "$dmcrypt"
-                                [ -n "$DO_ZFS" -a -f "$ZFS_TEMP" ] && printf "  %-30s" "$zfs"
+				printf "  %-15s %-4s %-20s%-45s" $host $name "$model" "$DID"
+                                [ "$DO_REV" == 1 ] && printf "%-10s" $rev
+                                printf "%-25s" "$serial"
+                                [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "$warranty"
+                                [ "$DO_MD" == 1 ] && printf "%-10s" "$md"
+                                [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && printf "%-10s" "$vg"
+                                [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ] && printf "%-25s" "$dmcrypt"
+                                [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "  %-30s" "$zfs"
                                 printf "%8s\n" "$size"
 			    done # => 'while read block; do'
 		    else
