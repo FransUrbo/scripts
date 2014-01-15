@@ -1,0 +1,5 @@
+#!/bin/sh
+
+if [ -f /sys/block/$1/device/delete ]; then
+        echo 1 > /sys/block/$1/device/delete
+fi
