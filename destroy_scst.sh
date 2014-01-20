@@ -1,12 +1,19 @@
 #!/bin/sh
 
 SYSFS=/sys/kernel/scst_tgt
-IQN="iqn.2012-11.com.bayour:"
 
-for path in $SYSFS/targets/iscsi/iqn.*; do
-    name=`echo $path | sed 's@.*/@@'`
+cd $SYSFS/targets/iscsi/
+if [ -z "$*" ]; then
+    targets=`echo iqn.*`
+else
+    targets=`echo $*`
+fi
+
+for name in $targets; do
     find $SYSFS/targets/iscsi/$name/sessions/* -type d > /dev/null 2>&1
     if [ "$?" -eq "1" ]; then
+        [ ! -f "$SYSFS/targets/iscsi/$name/enabled" ] && continue
+
 	#scstadmin -noprompt -disable_target $name -driver iscsi
 	echo 0 > $SYSFS/targets/iscsi/$name/enabled
 
