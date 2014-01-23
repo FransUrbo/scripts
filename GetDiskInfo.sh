@@ -39,7 +39,7 @@ if type cryptsetup > /dev/null 2>&1; then
     fi
 fi
 
-DO_WARRANTY=1 ; DO_REV=1
+DO_WARRANTY=1 ; DO_REV=1 ; DO_LOCATION=1
 
 # --------------
 # Get the CLI options - override DO_* above...
@@ -71,6 +71,7 @@ printf "%-25s" "Serial"
 [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && printf "%-10s" "VG"
 [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]  && printf "%-25s" "DM-CRYPT"
 [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "%-30s" "    ZFS"
+[ "$DO_LOCATION" == 1 ] && printf "%-4s" " PHY"
 printf "  %8s\n\n" "Size"
 
 lspci -D | \
@@ -375,7 +376,7 @@ lspci -D | \
                                 # Get warranty information
                                 # Columns: Model, Serial, Rev, Warranty, Device separated
                                 # by tabs.
-                                if [ "$DO_WARRANTY" == 1 -a -f ~/.disks_serial+warranty ]; then
+                                if [ "$DO_WARRANTY" == 1 -a -f $HOME/.disks_serial+warranty ]; then
                                     if echo "$model" | grep -q " "; then
                                         tmpmodel=`echo "$model" | sed 's@ @@g'`
                                     else
@@ -393,6 +394,26 @@ lspci -D | \
                                 fi
 
 				# ----------------------
+                                # Get physical location
+                                # Columns: Model, Serial, Enclosure, Slot separated by tabs
+                                if [ "$DO_LOCATION" == 1 -a -f $HOME/.disks_physical_location ]; then
+                                    if echo "$model" | grep -q " "; then
+                                        tmpmodel=`echo "$model" | sed 's@ @@g'`
+                                    else
+                                        tmpmodel="$model"
+                                    fi
+
+                                    set -- `egrep -w "^$tmpmodel.*$serial" ~/.disks_physical_location`
+                                    if [ -n "$3" -a -n "$4" ]; then
+                                        location="$3:$4"
+                                    else
+                                        location="n/a"
+                                    fi
+                                else
+                                    location="n/a"
+                                fi
+
+				# ----------------------
 				# Output information
 				printf "  %-15s %-4s %-20s%-45s" $host $name "$model" "$DID"
                                 [ "$DO_REV" == 1 ] && printf "%-10s" $rev
@@ -402,6 +423,7 @@ lspci -D | \
                                 [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && printf "%-10s" "$vg"
                                 [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ] && printf "%-25s" "$dmcrypt"
                                 [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "  %-30s" "$zfs"
+                                [ "$DO_LOCATION" == 1 ] && printf "%-4s" "$location"
                                 printf "%8s\n" "$size"
 			    done # => 'while read block; do'
 		    else
