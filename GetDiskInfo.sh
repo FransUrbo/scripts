@@ -2,6 +2,11 @@
 
 #ll /sys/bus/pci/devices/0000:0[2-4]:00.0/host*/target*/[0-9]*/block*
 
+if [ "$USER" != "root" ]; then
+    echo "This script needs to run with root privilegues."
+    exit 1
+fi
+
 DO_ZFS=
 if type zpool > /dev/null 2>&1; then
     DO_ZFS=1
@@ -242,7 +247,7 @@ lspci -D | \
 				    # ----------------------
 				    if [ -d "/dev/disk/by-id" ]; then
 					# Get device name (Disk by ID)
-					DID=`/bin/ls -l /dev/disk/by-id/$type* | \
+					DID=`/bin/ls -l /dev/disk/by-id/$type* 2> /dev/null | \
 					    grep -v part | \
 					    grep $name | \
 					    sed "s@.*/$type-\(.*\) -.*@\1@"`
