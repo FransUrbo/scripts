@@ -100,8 +100,8 @@ lspci -D | \
 		while read path; do
 		    # ----------------------
 		    # Get HOST name
-		    if [ -d $path/host? ]; then
-                        host=`echo $path/host? | sed 's@.*/@@'`
+		    if [ -d $path/host* ]; then
+                        host=`echo $path/host* | sed 's@.*/@@'`
                     else
 		        host=`echo "$path" | sed 's@.*/@@'`
                     fi
