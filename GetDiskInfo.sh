@@ -1,12 +1,45 @@
 #!/bin/bash
 
-#ll /sys/bus/pci/devices/0000:0[2-4]:00.0/host*/target*/[0-9]*/block*
+# Script to do a full inventory of all disks in the system.
+# Copyleft: Turbo Fredriksson <turbo@bayour.com>
+# Released under the GPL (version of your choosing).
 
-if [ "$USER" != "root" ]; then
-    echo "This script needs to run with root privilegues."
-    exit 1
-fi
+# The following commands improve output, but is not required:
+#   zpool, pvs, cryptsetup, bc
+# 
+# The following command is not required, but they should really
+# exist for best usage:
+#   lsscsi, hdparm, fdisk
+# 
+# The following command is required (won't work without it!):
+#   lspci
+#
+# Extra information is stored in the following files (script will
+# ignore any line that starts with a dash - #):
+#   $HOME/.disks_physical_location
+#       Columns: Model, Serial, Enclosure, Slot - separated by tabs
+#       Example:
+#
+#       # Model		Serial			Enclosure	Slot
+#       ST31500341AS	9VS4XK4T		4		1
+#       ST31500341AS	9VS3SAWS		4		3
+#
+#   $HOME/.disks_serial+warranty
+#       Columns: Model, Serial, Rev, Warranty, Device - separated by tabs.
+#       # Model		Serial			Rev	Warranty	Device
+#       ST31500341AS	9VS4XK4T		CC1H	20140112	sdf
+#       ST31500341AS	9VS3SAWS		CC1H	+		sdh
+#
+#   For me, a '+' means that the warranty have expired. This can be any
+#   character, just remember what means what. Only Model and Warranty
+#   column is of importance. Must be first and fourth though!
 
+[ "$USER" != "root" ] && \
+    echo "WARNING: This script really needs to run with root privilegues." \
+    > /dev/stderr
+
+# --------------
+# Set/figure out default output information
 DO_ZFS=
 if type zpool > /dev/null 2>&1; then
     DO_ZFS=1
@@ -70,13 +103,13 @@ while true ; do
         --no-warranty)		DO_WARRANTY=0		; shift ;;
         --no-rev)		DO_REV=0		; shift ;;
         --machine-readable)	DO_MACHINE_READABLE=1	; shift ;;
-        --help)
+        --help|-h)
 	    echo "Usage: `basename $0` [--no-zfs|--no-pvm|--no-md|--no-dmcrypt|--no-location|--no-warranty|--no-rev|--machine-readable]"
             echo
             exit 0
             ;;
-	--)		shift ; break ;;
-	*)		echo "Internal error!"	; exit 1 ;;
+	--)			shift			; break ;;
+	*)			echo "Internal error!"	; exit 1 ;;
     esac
 done
 
@@ -418,8 +451,6 @@ lspci -D | \
 
 				# ----------------------
                                 # Get warranty information
-                                # Columns: Model, Serial, Rev, Warranty, Device separated
-                                # by tabs.
                                 if [ "$DO_WARRANTY" == 1 ]; then
                                     if echo "$model" | grep -q " "; then
                                         tmpmodel=`echo "$model" | sed 's@ @@g'`
@@ -439,7 +470,6 @@ lspci -D | \
 
 				# ----------------------
                                 # Get physical location
-                                # Columns: Model, Serial, Enclosure, Slot separated by tabs
                                 if [ "$DO_LOCATION" == 1 ]; then
                                     if echo "$model" | grep -q " "; then
                                         tmpmodel=`echo "$model" | sed 's@ @@g'`
