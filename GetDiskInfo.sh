@@ -112,7 +112,11 @@ lspci -D | \
 	id=`echo "$line" | sed 's@ .*@@'`
 
 	if echo $line | egrep -q 'SATA|SCSI|RAID'; then
-	    type=scsi
+	    if echo $line | grep -q 'IDE mode'; then
+		type=ata
+	    else
+		type=scsi
+	    fi
 	else
 	    type=ata
 	fi
@@ -160,7 +164,7 @@ lspci -D | \
                                 blocks=`echo "$ports" | sed 's@/end_dev.*@@'`
                             else
 				# Fouth check - catch cciss targets.
-                                blocks=`find $path -name rev 2> /dev/null`
+                                blocks=`find $path -name rev 2> /dev/null | head -n1`
                                 if [ -n "$blocks" ]; then
                                     blocks=`dirname "$blocks"`
                                 fi
@@ -194,7 +198,7 @@ lspci -D | \
 				    # /sys/block/*/device | grep '/0000:05:00.0/host8/'
 				    name=`stat /sys/block/*/device | \
 					egrep "File: .*/$id.*$host/.*$t_id|File: .*/$t_id" | \
-					sed -e "s@.*block/\(.*\)/device'.*@\1@" \
+					sed -e "s@.*block/\(.*\)/device.*@\1@" \
 				            -e 's@.*\!@@'`
 				    if [ -z "$name" ]; then
 					name="n/a"
