@@ -97,8 +97,8 @@ else
     [ "$DO_MD" == 1 ] && printf "%-10s" "MD"
     [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && printf "%-10s" "VG"
     [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]  && printf "%-25s" "DM-CRYPT"
-    [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "%-30s" "    ZFS"
-    printf "  %8s\n\n" "Size"
+    [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "%-30s" "  ZFS"
+    printf "%8s\n\n" "Size"
 fi
 
 lspci -D | \
@@ -402,7 +402,7 @@ lspci -D | \
 				    fi
 				    if [ -z "$size" ]; then
                                         size="n/a"
-                                    elif echo "$size" | grep -q " "; then
+                                    else
                                         size=`echo "$size" | sed 's@ @@g'`
                                     fi
 				fi
@@ -463,16 +463,16 @@ lspci -D | \
                                     [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && echo -n "$zfs;"
                                     echo "$size"
                                 else
-				    printf "  %-15s" $host
+				    printf "  %-15s" "$host"
                                     [ "$DO_LOCATION" == 1 ] && printf "%-4s" "$location"
-                                    printf " %-4s %-20s%-45s" $name "$model" "$DID"
-                                    [ "$DO_REV" == 1 ] && printf "%-10s" $rev
+                                    printf " %-4s %-20s%-45s" "$name" "$model" "$DID"
+                                    [ "$DO_REV" == 1 ] && printf "%-10s" "$rev"
                                     printf "%-25s" "$serial"
                                     [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "$warranty"
                                     [ "$DO_MD" == 1 ] && printf "%-10s" "$md"
                                     [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && printf "%-10s" "$vg"
                                     [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ] && printf "%-25s" "$dmcrypt"
-                                    [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "  %-30s" "$zfs"
+                                    [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "%-30s" "$zfs"
                                     printf "%8s\n" "$size"
                                 fi
 			    done # => 'while read block; do'
