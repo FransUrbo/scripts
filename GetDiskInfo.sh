@@ -165,7 +165,7 @@ lspci -D | \
 
 				if echo "$path" | egrep -q '/port-*:?'; then
                                     # path: '/sys/devices/pci0000:00/0000:00:0b.0/0000:03:00.0/host0/port-0:0/end_device-0:0/target0:0:0/0:0:0:0'
-                                    host=`echo "$path" | sed "s@.*/.*\(host[0-9]\+\)/.*port-\([0-9]\+\):.*@\1:\2@"`
+                                    host=`echo "$path" | sed "s@.*/.*\(host[0-9]\+\)/.*port-\([0-9]\+\):\([0-9]\+\)/end.*@\1:\3@"`
                                 fi
 
 				# ----------------------
