@@ -39,22 +39,23 @@ if type cryptsetup > /dev/null 2>&1; then
     fi
 fi
 
-DO_WARRANTY=1 ; DO_REV=1 ; DO_LOCATION=1
+DO_WARRANTY=1 ; DO_REV=1 ; DO_LOCATION=1 ; DO_MACHINE_READABLE=0
 
 # --------------
 # Get the CLI options - override DO_* above...
-TEMP=`getopt -o h --long no-zfs,no-pvm,no-md,no-dmcrypt,no-warranty,no-rev,help -- "$@"`
+TEMP=`getopt -o h --long no-zfs,no-pvm,no-md,no-dmcrypt,no-warranty,no-rev,help,machine-readable -- "$@"`
 eval set -- "$TEMP"
 while true ; do
     case "$1" in
-        --no-zfs)	DO_ZFS=0	; shift ;;
-        --no-pvm)	DO_PVM=0	; shift ;;
-        --no-md)	DO_MD=0		; shift ;;
-        --no-dmcrypt)	DO_DMCRYPT=0	; shift ;;
-        --no-warranty)	DO_WARRANTY=0	; shift ;;
-        --no-rev)	DO_REV=0	; shift ;;
+        --no-zfs)		DO_ZFS=0		; shift ;;
+        --no-pvm)		DO_PVM=0		; shift ;;
+        --no-md)		DO_MD=0			; shift ;;
+        --no-dmcrypt)		DO_DMCRYPT=0		; shift ;;
+        --no-warranty)		DO_WARRANTY=0		; shift ;;
+        --no-rev)		DO_REV=0		; shift ;;
+        --machine-readable)	DO_MACHINE_READABLE=1	; shift ;;
         --help)
-	    echo "Usage: `basename $0` [--no-zfs|--no-pvm|--no-md|--no-dmcrypt]"
+	    echo "Usage: `basename $0` [--no-zfs|--no-pvm|--no-md|--no-dmcrypt|--no-warranty|--no-rev|--machine-readable]"
             echo
             exit 0
             ;;
@@ -63,17 +64,31 @@ while true ; do
     esac
 done
 
-printf "  %-15s" "Host" 
-[ "$DO_LOCATION" == 1 ] && printf "%-4s" "PHY"
-printf " %-4s %-20s%-45s" "Name" "Model" "Device by ID"
-[ "$DO_REV" == 1 ] && printf "%-10s" "Rev"
-printf "%-25s" "Serial"
-[ "$DO_WARRANTY" == 1 ] && printf "%-10s" "Warranty"
-[ "$DO_MD" == 1 ] && printf "%-10s" "MD"
-[ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && printf "%-10s" "VG"
-[ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]  && printf "%-25s" "DM-CRYPT"
-[ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "%-30s" "    ZFS"
-printf "  %8s\n\n" "Size"
+if [ "$DO_MACHINE_READABLE" == 1 ]; then
+    echo -n "CTRL;Host;"
+    [ "$DO_LOCATION" == 1 ] && echo -n "PHY;"
+    echo -n "Name;Model;Device by ID;"
+    [ "$DO_REV" == 1 ] && echo -n "Rev;"
+    echo -n "Serial;"
+    [ "$DO_WARRANTY" == 1 ] && echo -n "Warranty;"
+    [ "$DO_MD" == 1 ] && echo -n "MD;"
+    [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && echo -n "VG;"
+    [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]  && echo -n "DM-CRYPT;"
+    [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && echo -n "ZFS;"
+    echo "Size"
+else
+    printf "  %-15s" "Host" 
+    [ "$DO_LOCATION" == 1 ] && printf "%-4s" "PHY"
+    printf " %-4s %-20s%-45s" "Name" "Model" "Device by ID"
+    [ "$DO_REV" == 1 ] && printf "%-10s" "Rev"
+    printf "%-25s" "Serial"
+    [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "Warranty"
+    [ "$DO_MD" == 1 ] && printf "%-10s" "MD"
+    [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && printf "%-10s" "VG"
+    [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]  && printf "%-25s" "DM-CRYPT"
+    [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "%-30s" "    ZFS"
+    printf "  %8s\n\n" "Size"
+fi
 
 lspci -D | \
     egrep 'SATA|SCSI|IDE|RAID' | \
@@ -86,14 +101,18 @@ lspci -D | \
 	    type=ata
 	fi
 
-        echo "$line"
+        if [ "$DO_MACHINE_READABLE" == 1 ]; then
+            ctrl="$line"
+        else
+            echo "$line"
+        fi
 
 	# First while, just to sort '.../host2' before '.../host10'.
 	find /sys/bus/pci/devices/$id/{host*,ide*,ata*,cciss*} -maxdepth 0 2> /dev/null | \
 	    while read path; do
 	    host=`echo "$path" | sed -e 's@.*/host\(.*\)@\1@' -e 's@.*/ide\(.*\)@\1@' \
 			-e 's@.*/ata\(.*\)@\1@' -e 's@.*/cciss\(.*\)@\1@'`
-	    printf "host%0.2d;$path\n" "$host"
+            printf "host%0.2d;$path\n" "$host"
 	done | \
 	    sort | \
 		sed 's@.*;@@' | \
@@ -416,32 +435,50 @@ lspci -D | \
 
 				# ----------------------
 				# Output information
-				printf "  %-15s" $host
-                                [ "$DO_LOCATION" == 1 ] && printf "%-4s" "$location"
-                                printf " %-4s %-20s%-45s" $name "$model" "$DID"
-                                [ "$DO_REV" == 1 ] && printf "%-10s" $rev
-                                printf "%-25s" "$serial"
-                                [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "$warranty"
-                                [ "$DO_MD" == 1 ] && printf "%-10s" "$md"
-                                [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && printf "%-10s" "$vg"
-                                [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ] && printf "%-25s" "$dmcrypt"
-                                [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "  %-30s" "$zfs"
-                                printf "%8s\n" "$size"
+                                if [ "$DO_MACHINE_READABLE" == 1 ]; then
+                                    echo -n "$ctrl;$host;"
+                                    [ "$DO_LOCATION" == 1 ] && echo -n "$location;"
+                                    echo -n "$name;$model;$DID;"
+                                    [ "$DO_REV" == 1 ] && echo -n "$rev;"
+                                    echo -n "$serial;"
+                                    [ "$DO_WARRANTY" == 1 ] && echo -n "$warranty;"
+                                    [ "$DO_MD" == 1 ] && echo -n "$md;"
+                                    [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && echo -n "$vg;"
+                                    [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ] && echo -n "$dmcrypt;"
+                                    [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && echo -n "$zfs;"
+                                    echo "$size"
+                                else
+				    printf "  %-15s" $host
+                                    [ "$DO_LOCATION" == 1 ] && printf "%-4s" "$location"
+                                    printf " %-4s %-20s%-45s" $name "$model" "$DID"
+                                    [ "$DO_REV" == 1 ] && printf "%-10s" $rev
+                                    printf "%-25s" "$serial"
+                                    [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "$warranty"
+                                    [ "$DO_MD" == 1 ] && printf "%-10s" "$md"
+                                    [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && printf "%-10s" "$vg"
+                                    [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ] && printf "%-25s" "$dmcrypt"
+                                    [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "  %-30s" "$zfs"
+                                    printf "%8s\n" "$size"
+                                fi
 			    done # => 'while read block; do'
 		    else
-			printf "  %-15s\n" $host
+                        if [ "$DO_MACHINE_READABLE" == 0 ]; then
+			    printf "  %-15s\n" $host
+                        fi
 		    fi
 		done # => 'while read path; do'
 
-        echo
+        [ "$DO_MACHINE_READABLE" == 0 ] && echo
     done
 
-[ -n "$have_dmcrypted" ] && echo "*  => is a dm-crypt device"
-[ -n "$resilvering" ] && echo "rs => Resilvering"
-[ "$offline_type" == "O" ] && echo "O  => Offline"
-[ "$offline_type" == "U" ] && echo "U  => Unavail"
-[ "$offline_type" == "F" ] && echo "F  => Faulted"
-[ "$offline_type" == "R" ] && echo "R  => Removed"
+if [ "$DO_MACHINE_READABLE" == 0 ]; then
+    [ -n "$have_dmcrypted" ] && echo "*  => is a dm-crypt device"
+    [ -n "$resilvering" ] && echo "rs => Resilvering"
+    [ "$offline_type" == "O" ] && echo "O  => Offline"
+    [ "$offline_type" == "U" ] && echo "U  => Unavail"
+    [ "$offline_type" == "F" ] && echo "F  => Faulted"
+    [ "$offline_type" == "R" ] && echo "R  => Removed"
+fi
 
 [ -n "$ZFS_TEMP" ] && rm -f $ZFS_TEMP
 [ -n "$PVM_TEMP" ] && rm -f $PVM_TEMP
