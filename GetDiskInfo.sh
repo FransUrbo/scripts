@@ -39,11 +39,21 @@ if type cryptsetup > /dev/null 2>&1; then
     fi
 fi
 
-DO_WARRANTY=1 ; DO_REV=1 ; DO_LOCATION=1 ; DO_MACHINE_READABLE=0
+DO_LOCATION=
+if [ -f $HOME/.disks_physical_location ]; then
+    DO_LOCATION=1
+fi
+
+DO_WARRANTY=
+if [ -f $HOME/.disks_serial+warranty ]; then
+    DO_WARRANTY=1
+fi
+
+DO_REV=1 ; DO_MACHINE_READABLE=0
 
 # --------------
 # Get the CLI options - override DO_* above...
-TEMP=`getopt -o h --long no-zfs,no-pvm,no-md,no-dmcrypt,no-warranty,no-rev,help,machine-readable -- "$@"`
+TEMP=`getopt -o h --long no-zfs,no-pvm,no-md,no-dmcrypt,no-location,no-warranty,no-rev,help,machine-readable -- "$@"`
 eval set -- "$TEMP"
 while true ; do
     case "$1" in
@@ -51,11 +61,12 @@ while true ; do
         --no-pvm)		DO_PVM=0		; shift ;;
         --no-md)		DO_MD=0			; shift ;;
         --no-dmcrypt)		DO_DMCRYPT=0		; shift ;;
+        --no-location)		DO_LOCATION=0		; shift ;;
         --no-warranty)		DO_WARRANTY=0		; shift ;;
         --no-rev)		DO_REV=0		; shift ;;
         --machine-readable)	DO_MACHINE_READABLE=1	; shift ;;
         --help)
-	    echo "Usage: `basename $0` [--no-zfs|--no-pvm|--no-md|--no-dmcrypt|--no-warranty|--no-rev|--machine-readable]"
+	    echo "Usage: `basename $0` [--no-zfs|--no-pvm|--no-md|--no-dmcrypt|--no-location|--no-warranty|--no-rev|--machine-readable]"
             echo
             exit 0
             ;;
@@ -400,7 +411,7 @@ lspci -D | \
                                 # Get warranty information
                                 # Columns: Model, Serial, Rev, Warranty, Device separated
                                 # by tabs.
-                                if [ "$DO_WARRANTY" == 1 -a -f $HOME/.disks_serial+warranty ]; then
+                                if [ "$DO_WARRANTY" == 1 ]; then
                                     if echo "$model" | grep -q " "; then
                                         tmpmodel=`echo "$model" | sed 's@ @@g'`
                                     else
@@ -420,7 +431,7 @@ lspci -D | \
 				# ----------------------
                                 # Get physical location
                                 # Columns: Model, Serial, Enclosure, Slot separated by tabs
-                                if [ "$DO_LOCATION" == 1 -a -f $HOME/.disks_physical_location ]; then
+                                if [ "$DO_LOCATION" == 1 ]; then
                                     if echo "$model" | grep -q " "; then
                                         tmpmodel=`echo "$model" | sed 's@ @@g'`
                                     else
