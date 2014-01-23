@@ -377,19 +377,23 @@ lspci -D | \
 
 				    # ----------------------
 				    # Get size of disk
-				    if type fdisk > /dev/null 2>&1 && type bc > /dev/null 2>&1; then
+				    if type fdisk > /dev/null 2>&1; then
 					if [ -n "$dev_path" ]; then
 					    size=`fdisk -l $dev_path 2> /dev/null | \
 						grep '^Disk /' | \
 						sed -e "s@.*: \(.*\), .*@\1@" \
 						    -e 's@\.[0-9] @@'`
-					    if echo "$size" | egrep -q '^[0-9][0-9][0-9][0-9]GB'; then
+					    if echo "$size" | egrep -q '^[0-9][0-9][0-9][0-9]GB' && type bc > /dev/null 2>&1; then
 						s=`echo "$size" | sed 's@GB@@'`
 						size=`echo "scale=2; $s / 1024" | bc`"TB"
 					    fi
 					fi
 				    fi
-				    [ -z "$size" ] && size="n/a"
+				    if [ -z "$size" ]; then
+                                        size="n/a"
+                                    elif echo "$size" | grep -q " "; then
+                                        size=`echo "$size" | sed 's@ @@g'`
+                                    fi
 				fi
 
 				# ----------------------
