@@ -63,7 +63,9 @@ while true ; do
     esac
 done
 
-printf "  %-15s %-4s %-20s%-45s" "Host" "Name" "Model" "Device by ID"
+printf "  %-15s" "Host" 
+[ "$DO_LOCATION" == 1 ] && printf "%-4s" "PHY"
+printf " %-4s %-20s%-45s" "Name" "Model" "Device by ID"
 [ "$DO_REV" == 1 ] && printf "%-10s" "Rev"
 printf "%-25s" "Serial"
 [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "Warranty"
@@ -71,7 +73,6 @@ printf "%-25s" "Serial"
 [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && printf "%-10s" "VG"
 [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]  && printf "%-25s" "DM-CRYPT"
 [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "%-30s" "    ZFS"
-[ "$DO_LOCATION" == 1 ] && printf "%-4s" " PHY"
 printf "  %8s\n\n" "Size"
 
 lspci -D | \
@@ -415,7 +416,9 @@ lspci -D | \
 
 				# ----------------------
 				# Output information
-				printf "  %-15s %-4s %-20s%-45s" $host $name "$model" "$DID"
+				printf "  %-15s" $host
+                                [ "$DO_LOCATION" == 1 ] && printf "%-4s" "$location"
+                                printf " %-4s %-20s%-45s" $name "$model" "$DID"
                                 [ "$DO_REV" == 1 ] && printf "%-10s" $rev
                                 printf "%-25s" "$serial"
                                 [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "$warranty"
@@ -423,11 +426,10 @@ lspci -D | \
                                 [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && printf "%-10s" "$vg"
                                 [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ] && printf "%-25s" "$dmcrypt"
                                 [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "  %-30s" "$zfs"
-                                [ "$DO_LOCATION" == 1 ] && printf "%-4s" "$location"
                                 printf "%8s\n" "$size"
 			    done # => 'while read block; do'
 		    else
-			printf "  %-15s n/a\n" $host
+			printf "  %-15s\n" $host
 		    fi
 		done # => 'while read path; do'
 
