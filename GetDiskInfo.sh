@@ -253,7 +253,7 @@ lspci -D | \
 					    sed "s@.*/$type-\(.*\) -.*@\1@"`
                                         if [ -z "$DID" ]; then
                                             # Try again, with a partition.
-                                            DID=`/bin/ls -l /dev/disk/by-id/$type* | \
+                                            DID=`/bin/ls -l /dev/disk/by-id/$type* 2> /dev/null | \
 						grep $name | \
 						sed "s@.*/$type-\(.*\)-part.* -.*@\1@" | \
 						head -n1`
