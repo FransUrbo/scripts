@@ -9,10 +9,11 @@
 # 
 # The following command is not required, but they should really
 # exist for best usage:
-#   lsscsi, hdparm, fdisk
+#   lsscsi, fdisk
 # 
 # The following command is required (won't work without it!):
-#   lspci
+#   lspci, tempfile, getopt, basename, grep, find, cat, ls,
+#   mount, /bin/pwd
 #
 # Extra information is stored in the following files (script will
 # ignore any line that starts with a dash - #):
@@ -87,6 +88,7 @@ if [ -f $HOME/.disks_serial+warranty ]; then
     DO_WARRANTY=1
 fi
 
+TEMP_FILE=`tempfile -d /tmp -p dsk.`
 DO_REV=1 ; DO_MACHINE_READABLE=0
 
 # --------------
@@ -113,6 +115,8 @@ while true ; do
     esac
 done
 
+# --------------
+# Output header
 if [ "$DO_MACHINE_READABLE" == 1 ]; then
     echo -n "CTRL;Host;"
     [ "$DO_LOCATION" == 1 ] && echo -n "PHY;"
@@ -139,11 +143,26 @@ else
     printf "%8s\n\n" "Size"
 fi
 
+# --------------
+get_udev_info () {
+    key=$1
+    val=$(grep "$key=" $TEMP_FILE | sed 's@.*=@@')
+    if [ -z "$val" ]; then
+        echo "n/a"
+    else
+        echo "$val"
+    fi
+}
+
+# --------------
+# MAIN function - get a list of all PCI devices, extract storage devices.
 lspci -D | \
     egrep 'SATA|SCSI|IDE|RAID' | \
     while read line; do
-	id=`echo "$line" | sed 's@ .*@@'`
+	ctrl_id=`echo "$line" | sed 's@ .*@@'`
 
+        # --------------
+        # What type is this - ata/ide or scsi/sata
 	if echo $line | egrep -q 'SATA|SCSI|RAID'; then
 	    if echo $line | grep -q 'IDE mode'; then
 		type=ata
@@ -160,8 +179,9 @@ lspci -D | \
             echo "$line"
         fi
 
+        # --------------
 	# First while, just to sort '.../host2' before '.../host10'.
-	find /sys/bus/pci/devices/$id/{host*,ide*,ata*,cciss*} -maxdepth 0 2> /dev/null | \
+	find /sys/bus/pci/devices/$ctrl_id/{host*,ide*,ata*,cciss*} -maxdepth 0 2> /dev/null | \
 	    while read path; do
 	    host=`echo "$path" | sed -e 's@.*/host\(.*\)@\1@' -e 's@.*/ide\(.*\)@\1@' \
 			-e 's@.*/ata\(.*\)@\1@' -e 's@.*/cciss\(.*\)@\1@'`
@@ -178,36 +198,19 @@ lspci -D | \
 		        host=`echo "$path" | sed 's@.*/@@'`
                     fi
 
+		    # ----------------------
+                    # Make sure this host actually have devices attached.
 		    got_hosts=`find "$path/.." -maxdepth 1 -type d -name 'host*'`
 		    chk_ata=`echo "$host" | grep ^ata`
 		    [ -n "$got_hosts" -a -n "$chk_ata" ] && continue
 
 		    # ----------------------
 		    # Get block path
-		    blocks=`find $path/[0-9]*/block*/* -maxdepth 0 2> /dev/null`
-		    if [ -z "$blocks" ]; then
-			# Check again - look for the 'rev' file. 
-			blocks=`find $path/target*/[0-9]*/rev 2> /dev/null`
-			if [ -n "$blocks" ]; then
-			    blocks=`find $path/target*/[0-9]* -maxdepth 0 | head -n1`
-			else
-                            # Third check - catch the SAS2LP
-                            ports=`find $path -maxdepth 2 -name 'port-*:?' -type d | head -n1`
-                            if [ -n "$ports" ]; then
-                                blocks=`echo "$ports" | sed 's@/end_dev.*@@'`
-                            else
-				# Fouth check - catch cciss targets.
-                                blocks=`find $path -name rev 2> /dev/null | head -n1`
-                                if [ -n "$blocks" ]; then
-                                    blocks=`dirname "$blocks"`
-                                fi
-                            fi
-                        fi
-                    fi
+                    blocks=`find $path -name rev 2> /dev/null | sort`
 
 		    # ----------------------
 		    if [ -n "$blocks" ]; then
-			find $blocks/../.. -name 'rev' |
+			echo "$blocks" |
 			    while read block; do
 				# Reset path variable to actual/full path for this device
 				path=`echo "$block" | sed 's@/rev.*@@'`
@@ -223,231 +226,210 @@ lspci -D | \
 
 				# ----------------------
 				# Get name
-				name=""
+				name=
 				if echo "$t_id" | egrep -q "^[0-9]" && type lsscsi > /dev/null 2>&1; then
 				    name=`lsscsi --device "$t_id" | sed -e 's@.*/@@' -e 's@ \[.*@@' -e 's@\[.*@@'`
 				fi
 				if [ -z "$name" -o "$name" == "-" ]; then
 				    # /sys/block/*/device | grep '/0000:05:00.0/host8/'
-				    name=`stat /sys/block/*/device | \
-					egrep "File: .*/$id.*$host/.*$t_id|File: .*/$t_id" | \
-					sed -e "s@.*block/\(.*\)/device.*@\1@" \
-				            -e 's@.*\!@@'`
+				    name=`ls -ln /sys/block/*/device | \
+                                        grep "/$t_id" | sed -e "s@.*block/\(.*\)/device.*@\1@"`
 				    if [ -z "$name" ]; then
 					name="n/a"
 				    fi
 				fi
-                                dev_path=`find /dev -name "$name" -type b`
-
-				# ... model
-				model=`cat "$path/model" | sed -e 's@-.*@@' -e 's/ *$//g'`
-
-				# ... and revision
-                                if [ "$DO_REV" == 1 ]; then
-				    if [ -f "$path/rev" ]; then
-				        rev="`cat \"$path/rev\"`"
-				    else
-				        rev="n/a"
-				    fi
-                                fi
-
-                                # ... serial number
-                                if [ -b "/dev/$name" ]; then
-                                    if type hdparm > /dev/null 2>&1; then
-                                        set -- `hdparm -I /dev/$name 2> /dev/null | \
-                                            grep 'Serial Number:' | sed 's@Serial Number:@@'`
-                                        serial=$1
-				    fi
-                                fi
-                                [ -z "$serial" ] && serial="n/a"
 
 				# ----------------------
-				DID="n/a"
-				if [ -n "$name" -a "$name" != "n/a" ]; then
-				    # ----------------------
-				    if [ "$DO_MD" == 1 ]; then
-					# Get MD device
-					MD=`grep $name /proc/mdstat | sed 's@: active raid1 @@'`
-					if [ -n "$MD" ]; then
-					    # md3 sdg1[0] sdb1[1]
-					    set -- `echo "$MD"`
-					    for dev in $*; do
-						if echo "$dev" | grep -q "^$name"; then
-						    md="$1"
-						    break
-						fi
-					    done
-					fi
-					[ -z "$md" ] && md="n/a"
+                                # Get all info availible for $name
+                                udevadm info -q all -p /sys/block/$name > $TEMP_FILE
+                                
+				# ----------------------
+                                # Get dev path
+                                dev_path=$(get_udev_info DEVNAME)
+
+				# ----------------------
+				# Get model
+				model=$(get_udev_info ID_MODEL | sed 's@-.*@@')
+
+				# ----------------------
+				# Get and revision
+                                [ "$DO_REV" == 1 ] && rev=$(get_udev_info ID_REVISION)
+
+				# ----------------------
+                                # Get serial number
+                                serial=$(get_udev_info ID_SERIAL_SHORT)
+
+				# ----------------------
+				# Get device name (Disk by ID)
+                                device_id=$(get_udev_info ID_SCSI_COMPAT)
+
+				# ----------------------
+				# Get MD device
+				if [ "$DO_MD" == 1 ]; then
+				    MD=`grep $name /proc/mdstat | sed 's@: active raid1 @@'`
+				    if [ -n "$MD" ]; then
+					# md3 sdg1[0] sdb1[1]
+					set -- `echo "$MD"`
+					for dev in $*; do
+					    if echo "$dev" | grep -q "^$name"; then
+						md="$1"
+						break
+					    fi
+					done
 				    fi
+				    [ -z "$md" ] && md="n/a"
+				fi
 
-				    # ----------------------
-				    if [ -d "/dev/disk/by-id" ]; then
-					# Get device name (Disk by ID)
-					DID=`/bin/ls -l /dev/disk/by-id/$type* 2> /dev/null | \
-					    grep -v part | \
-					    grep $name | \
-					    sed "s@.*/$type-\(.*\) -.*@\1@"`
-                                        if [ -z "$DID" ]; then
-                                            # Try again, with a partition.
-                                            DID=`/bin/ls -l /dev/disk/by-id/$type* 2> /dev/null | \
-						grep $name | \
-						sed "s@.*/$type-\(.*\)-part.* -.*@\1@" | \
-						head -n1`
+				# ----------------------
+				# Get ZFS pool data for this disk ID
+				if [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ]; then
+				    # OID: SATA_Corsair_Force_311486508000008952122
+				    # ZFS: ata-Corsair_Force_3_SSD_11486508000008952122
+                                    tmpnam=`echo "$device_id" | sed "s@SATA_@@"`
+
+                                    # Setup a matching string.
+                                    # egrep matches _every line_ if 'NULL|sda|NULL'!
+                                    [ -n "$device_id" ] && zfs_regexp="$device_id"
+                                    if [ -n "$name" ]; then
+                                        if [ -n "$zfs_regexp" ]; then
+                                            zfs_regexp="$zfs_regexp|$name"
+                                        else
+                                            zfs_regexp="$name"
                                         fi
-				    fi
-
-				    # ----------------------
-				    # Get ZFS pool data for this disk ID
-				    if [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ]; then
-					# OID: SATA_Corsair_Force_311486508000008952122
-					# ZFS: ata-Corsair_Force_3_SSD_11486508000008952122
-					#tmpnam=`echo "$DID" | sed "s@SATA_\(.*_.*\)_[0-9].*@\1@"`
-                                        tmpnam=`echo "$DID" | sed "s@SATA_@@"`
-
-                                        # Setup a matching string.
-                                        # egrep matches _every line_ if 'NULL|sda|NULL'!
-                                        [ -n "$DID" ] && zfs_regexp="$DID"
-                                        if [ -n "$name" ]; then
-                                            if [ -n "$zfs_regexp" ]; then
-                                                zfs_regexp="$zfs_regexp|$name"
-                                            else
-                                                zfs_regexp="$name"
-                                            fi
+                                    fi
+                                    if [ -n "$tmpnam" ]; then
+                                        if [ -n "$zfs_regexp" ]; then
+                                            zfs_regexp="$zfs_regexp|$tmpnam"
+                                        else
+                                            zfs_regexp="$tmpnam"
                                         fi
-                                        if [ -n "$tmpnam" ]; then
-                                            if [ -n "$zfs_regexp" ]; then
-                                                zfs_regexp="$zfs_regexp|$tmpnam"
-                                            else
-                                                zfs_regexp="$tmpnam"
-                                            fi
-                                        fi
-					if [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]; then
-					    for dm_dev_name in $DMCRYPT; do
-						if echo $dm_dev_name | grep -q ":$name"; then
-						    tmpdmname=`echo "$dm_dev_name" | sed 's@:.*@@'`
-						    zfs_regexp="$zfs_regexp|$tmpdmname"
-						fi
-					    done
-					fi
-                                        if [ -n "$model" -a -n "$serial" ]; then
-                                            zfs_regexp="$zfs_regexp|$model-.*_$serial"
-                                        fi
-
-					zfs=$(cat $ZFS_TEMP | 
-					    while read zpool; do
-                                                offline="" ; crypted=" "
-						if echo "$zpool" | grep -q 'pool: '; then
-						    zfs_name=`echo "$zpool" | sed 's@.*: @@'`
-						elif echo "$zpool" | grep -q 'state: '; then
-						    zfs_state=`echo "$zpool" | sed 's@.*: @@'`
-						    shift ; shift ; shift ; shift ; shift
-						elif echo "$zpool" | egrep -q '^raid|^mirror|^cache|^spare'; then
-						    zfs_vdev=`echo "$zpool" | sed 's@ .*@@'`
-                                                elif echo "$zpool" | grep -q 'replacing'; then
-                                                    replacing="rpl"`echo "$zpool" | sed "s@.*-\([0-9]\+\) .*@\1@"`
-                                                    ii=1
-						elif echo "$zpool" | egrep -q "$zfs_regexp"; then
-						    if ! echo "$zpool" | egrep -q "ONLINE|AVAIL"; then
-							offline="!"
-							if echo "$zpool" | grep -q "OFFLINE"; then
-							    offline="$offline"O
-                                                            offline_type=O
-							elif echo "$zpool" | grep -q "UNAVAIL"; then
-							    offline="$offline"U
-                                                            offline_type=U
-							elif echo "$zpool" | grep -q "FAULTED"; then
-							    offline="$offline"F
-                                                            offline_type=F
-							elif echo "$zpool" | grep -q "REMOVED"; then
-							    offline="$offline"R
-                                                            offline_type=R
-							fi
-                                                    elif echo "$zpool" | grep -q "resilvering"; then
-                                                        offline="$offline"rs
-                                                        resilvering=1
-						    fi
-
-                                                    if [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]; then
-                                                        if echo "$zpool" | egrep -q "$tmpdmname"; then
-                                                            crypted="*"
-                                                            have_dmcrypted=1
-                                                        fi
-                                                    fi
-
-                                                    if [ -n "$replacing" -a -n "$offline" ]; then
-                                                        stat="$replacing"+"$offline"
-                                                    elif [ -n "$replacing" -a -z "$offline" ]; then
-                                                        stat="$replacing"
-                                                    elif [ -z "$replacing" -a -n "$offline" ]; then
-                                                        stat="$offline"
-                                                    fi
-
-						    if [ "x$zfs_name" != "" -a "$zfs_vdev" != "" ]; then
-							printf "$crypted %-17s$stat" "$zfs_name / $zfs_vdev"
-						    fi
-						fi
-
-                                                if [ "$ii" == 3 ]; then
-                                                    replacing=""
-                                                    ii=0
-                                                else
-                                                    ii=`expr $ii + 1`
-                                                fi
-					    done)
-					[ -z "$zfs" ] && zfs="  n/a"
-				    fi
-
-				    # ----------------------
-				    # Get LVM data (VG - Virtual Group) for this disk
-				    lvm_regexp="/$name"
-				    [ -n "$md" -a "$md" != "n/a" ] && lvm_regexp="$lvm_regexp|$md"
-				    if [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ]; then
-					vg=$(cat $PVM_TEMP |
-					    while read pvs; do
-						if echo "$pvs" | egrep -q "$lvm_regexp"; then
-						    echo "$pvs" | sed "s@.*,\(.*\),lvm.*@\1@"
-						fi
-					    done)
-                                        if [ -z "$vg" ]; then
-					    # Double check - is it mounted
-					    vg=`mount | grep "/$md" | sed "s@.* on \(.*\) type.*@\1@"`
-					fi					    
-                                        [ -z "$vg" ] && vg="n/a"
-				    fi
-
-				    # ----------------------
-				    # Get DM-CRYPT device mapper name
+                                    fi
 				    if [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]; then
 					for dm_dev_name in $DMCRYPT; do
-                                            set -- `echo $dm_dev_name | sed 's@:@ @'`
-                                            dm_name=$1 ; dm_dev=`echo $2 |  sed -e 's@[0-9]@@'`
-                                            echo "$DID" | grep -q "$dm_dev" && dmcrypt=$dm_name
-                                            [ "$name" == "$dm_dev" ] && dmcrypt=$dm_name
-					done
-                                        [ -z "$dmcrypt" ] && dmcrypt="n/a"
-				    fi
-
-				    # ----------------------
-				    # Get size of disk
-				    if type fdisk > /dev/null 2>&1; then
-					if [ -n "$dev_path" ]; then
-					    size=`fdisk -l $dev_path 2> /dev/null | \
-						grep '^Disk /' | \
-						sed -e "s@.*: \(.*\), .*@\1@" \
-						    -e 's@\.[0-9] @@'`
-					    if echo "$size" | egrep -q '^[0-9][0-9][0-9][0-9]GB' && type bc > /dev/null 2>&1; then
-						s=`echo "$size" | sed 's@GB@@'`
-						size=`echo "scale=2; $s / 1024" | bc`"TB"
+					    if echo $dm_dev_name | grep -q ":$name"; then
+						tmpdmname=`echo "$dm_dev_name" | sed 's@:.*@@'`
+						zfs_regexp="$zfs_regexp|$tmpdmname"
 					    fi
+					done
+				    fi
+                                    if [ -n "$model" -a -n "$serial" ]; then
+                                        zfs_regexp="$zfs_regexp|$model-.*_$serial"
+                                    fi
+                                    
+				    zfs=$(cat $ZFS_TEMP | 
+					while read zpool; do
+                                            offline="" ; crypted=" "
+					    if echo "$zpool" | grep -q 'pool: '; then
+						zfs_name=`echo "$zpool" | sed 's@.*: @@'`
+					    elif echo "$zpool" | grep -q 'state: '; then
+						zfs_state=`echo "$zpool" | sed 's@.*: @@'`
+						shift ; shift ; shift ; shift ; shift
+					    elif echo "$zpool" | egrep -q '^raid|^mirror|^cache|^spare'; then
+						zfs_vdev=`echo "$zpool" | sed 's@ .*@@'`
+                                            elif echo "$zpool" | grep -q 'replacing'; then
+                                                replacing="rpl"`echo "$zpool" | sed "s@.*-\([0-9]\+\) .*@\1@"`
+                                                ii=1
+					    elif echo "$zpool" | egrep -q "$zfs_regexp"; then
+						if ! echo "$zpool" | egrep -q "ONLINE|AVAIL"; then
+						    offline="!"
+						    if echo "$zpool" | grep -q "OFFLINE"; then
+							offline="$offline"O
+                                                        offline_type=O
+						    elif echo "$zpool" | grep -q "UNAVAIL"; then
+							offline="$offline"U
+                                                        offline_type=U
+						    elif echo "$zpool" | grep -q "FAULTED"; then
+							offline="$offline"F
+                                                        offline_type=F
+						    elif echo "$zpool" | grep -q "REMOVED"; then
+							offline="$offline"R
+                                                        offline_type=R
+						    fi
+                                                elif echo "$zpool" | grep -q "resilvering"; then
+                                                    offline="$offline"rs
+                                                    resilvering=1
+						fi
+
+                                                if [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]; then
+                                                    if echo "$zpool" | egrep -q "$tmpdmname"; then
+                                                        crypted="*"
+                                                        have_dmcrypted=1
+                                                    fi
+                                                fi
+
+                                                if [ -n "$replacing" -a -n "$offline" ]; then
+                                                    stat="$replacing"+"$offline"
+                                                elif [ -n "$replacing" -a -z "$offline" ]; then
+                                                    stat="$replacing"
+                                                elif [ -z "$replacing" -a -n "$offline" ]; then
+                                                    stat="$offline"
+                                                fi
+
+						if [ "x$zfs_name" != "" -a "$zfs_vdev" != "" ]; then
+						    printf "$crypted %-17s$stat" "$zfs_name / $zfs_vdev"
+						fi
+					    fi
+
+                                            if [ "$ii" == 3 ]; then
+                                                replacing=""
+                                                ii=0
+                                            else
+                                                ii=$[ $ii + 1 ]
+                                            fi
+					    done)
+				    [ -z "$zfs" ] && zfs="  n/a"
+				fi
+
+				# ----------------------
+				# Get LVM data (VG - Virtual Group) for this disk
+				lvm_regexp="/$name"
+				[ -n "$md" -a "$md" != "n/a" ] && lvm_regexp="$lvm_regexp|$md"
+				if [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ]; then
+				    vg=$(cat $PVM_TEMP |
+					while read pvs; do
+					    if echo "$pvs" | egrep -q "$lvm_regexp"; then
+						echo "$pvs" | sed "s@.*,\(.*\),lvm.*@\1@"
+					    fi
+					    done)
+                                    if [ -z "$vg" ]; then
+					    # Double check - is it mounted
+					vg=`mount | grep "/$md" | sed "s@.* on \(.*\) type.*@\1@"`
+				    fi					    
+                                    [ -z "$vg" ] && vg="n/a"
+				fi
+
+				# ----------------------
+				# Get DM-CRYPT device mapper name
+				if [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]; then
+				    for dm_dev_name in $DMCRYPT; do
+                                        set -- `echo $dm_dev_name | sed 's@:@ @'`
+                                        dm_name=$1 ; dm_dev=`echo $2 |  sed -e 's@[0-9]@@'`
+                                        echo "$device_id" | grep -q "$dm_dev" && dmcrypt=$dm_name
+                                        [ "$name" == "$dm_dev" ] && dmcrypt=$dm_name
+				    done
+                                    [ -z "$dmcrypt" ] && dmcrypt="n/a"
+				fi
+
+				# ----------------------
+				# Get size of disk
+				if type fdisk > /dev/null 2>&1; then
+				    if [ -n "$dev_path" ]; then
+					size=`fdisk -l $dev_path 2> /dev/null | \
+					    grep '^Disk /' | \
+					    sed -e "s@.*: \(.*\), .*@\1@" \
+					    -e 's@\.[0-9] @@' -e 's@ @@g'`
+					if echo "$size" | egrep -q '^[0-9][0-9][0-9][0-9]GB' && type bc > /dev/null 2>&1; then
+					    s=`echo "$size" | sed 's@GB@@'`
+					    size=`echo "scale=2; $s / 1024" | bc`"TB"
+                                        elif echo "$size" | egrep -q '^[0-9][0-9][0-9][0-9]MB' && type bc > /dev/null 2>&1; then
+					    s=`echo "$size" | sed 's@MB@@'`
+					    size=`echo "scale=2; $s / 1024" | bc`"GB"
 					fi
 				    fi
-				    if [ -z "$size" ]; then
-                                        size="n/a"
-                                    else
-                                        size=`echo "$size" | sed 's@ @@g'`
-                                    fi
 				fi
+				if [ -z "$size" ]; then
+                                    size="n/a"
+                                fi
 
 				# ----------------------
                                 # Get warranty information
@@ -458,7 +440,7 @@ lspci -D | \
                                         tmpmodel="$model"
                                     fi
 
-                                    set -- `egrep -w "^$tmpmodel.*$serial" ~/.disks_serial+warranty`
+                                    set -- `grep -E -w "^$tmpmodel.*$serial" ~/.disks_serial+warranty`
                                     if [ -n "$4" ]; then
                                         warranty="$4"
                                     else
@@ -477,7 +459,7 @@ lspci -D | \
                                         tmpmodel="$model"
                                     fi
 
-                                    set -- `egrep -w "^$tmpmodel.*$serial" ~/.disks_physical_location`
+                                    set -- `grep -E -w "^$tmpmodel.*$serial" ~/.disks_physical_location`
                                     if [ -n "$3" -a -n "$4" ]; then
                                         location="$3:$4"
                                     else
@@ -487,12 +469,12 @@ lspci -D | \
                                     location="n/a"
                                 fi
 
-				# ----------------------
+                                # ======================
 				# Output information
                                 if [ "$DO_MACHINE_READABLE" == 1 ]; then
                                     echo -n "$ctrl;$host;"
                                     [ "$DO_LOCATION" == 1 ] && echo -n "$location;"
-                                    echo -n "$name;$model;$DID;"
+                                    echo -n "$name;$model;$device_id;"
                                     [ "$DO_REV" == 1 ] && echo -n "$rev;"
                                     echo -n "$serial;"
                                     [ "$DO_WARRANTY" == 1 ] && echo -n "$warranty;"
@@ -504,7 +486,7 @@ lspci -D | \
                                 else
 				    printf "  %-15s" "$host"
                                     [ "$DO_LOCATION" == 1 ] && printf "%-4s" "$location"
-                                    printf " %-4s %-20s%-45s" "$name" "$model" "$DID"
+                                    printf " %-4s %-20s%-45s" "$name" "$model" "$device_id"
                                     [ "$DO_REV" == 1 ] && printf "%-10s" "$rev"
                                     printf "%-25s" "$serial"
                                     [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "$warranty"
@@ -536,3 +518,4 @@ fi
 
 [ -n "$ZFS_TEMP" ] && rm -f $ZFS_TEMP
 [ -n "$PVM_TEMP" ] && rm -f $PVM_TEMP
+rm -f $TEMP_FILE
