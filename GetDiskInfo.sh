@@ -363,7 +363,7 @@ lspci -D | \
 						fi
 
                                                 if [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]; then
-                                                    if [[ $zpool =~ $tmpdmname ]]; then
+                                                    if [[ -n "$tmpdmname" && $zpool =~ $tmpdmname ]]; then
                                                         crypted="*"
                                                         have_dmcrypted=1
                                                     fi
