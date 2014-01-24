@@ -13,7 +13,7 @@
 # 
 # The following command is required (won't work without it!):
 #   lspci, tempfile, getopt, basename, grep, find, cat, ls,
-#   mount, /bin/pwd
+#   mount, readlink
 #
 # Extra information is stored in the following files (script will
 # ignore any line that starts with a dash - #):
@@ -157,13 +157,13 @@ get_udev_info () {
 # --------------
 # MAIN function - get a list of all PCI devices, extract storage devices.
 lspci -D | \
-    egrep 'SATA|SCSI|IDE|RAID' | \
+    grep -E 'SATA|SCSI|IDE|RAID' | \
     while read line; do
 	ctrl_id=`echo "$line" | sed 's@ .*@@'`
 
         # --------------
         # What type is this - ata/ide or scsi/sata
-	if echo $line | egrep -q 'SATA|SCSI|RAID'; then
+	if echo $line | grep -E -q 'SATA|SCSI|RAID'; then
 	    if echo $line | grep -q 'IDE mode'; then
 		type=ata
 	    else
@@ -213,13 +213,10 @@ lspci -D | \
 			echo "$blocks" |
 			    while read block; do
 				# Reset path variable to actual/full path for this device
-				path=`echo "$block" | sed 's@/rev.*@@'`
-				pushd $path > /dev/null 2>&1
-				path=`/bin/pwd`
-				popd > /dev/null 2>&1
+                                path=$(readlink -f "$block" | sed 's@/rev.*@@')
 				t_id=`basename "$path"`
 
-				if echo "$path" | egrep -q '/port-*:?'; then
+				if echo "$path" | grep -E -q '/port-*:?'; then
                                     # path: '/sys/devices/pci0000:00/0000:00:0b.0/0000:03:00.0/host0/port-0:0/end_device-0:0/target0:0:0/0:0:0:0'
                                     host=`echo "$path" | sed "s@.*/.*\(host[0-9]\+\)/.*port-\([0-9]\+\):\([0-9]\+\)/end.*@\1:\3@"`
                                 fi
@@ -227,7 +224,7 @@ lspci -D | \
 				# ----------------------
 				# Get name
 				name=
-				if echo "$t_id" | egrep -q "^[0-9]" && type lsscsi > /dev/null 2>&1; then
+				if echo "$t_id" | grep -E -q "^[0-9]" && type lsscsi > /dev/null 2>&1; then
 				    name=`lsscsi --device "$t_id" | sed -e 's@.*/@@' -e 's@ \[.*@@' -e 's@\[.*@@'`
 				fi
 				if [ -z "$name" -o "$name" == "-" ]; then
@@ -288,7 +285,7 @@ lspci -D | \
                                     tmpnam=`echo "$device_id" | sed "s@SATA_@@"`
 
                                     # Setup a matching string.
-                                    # egrep matches _every line_ if 'NULL|sda|NULL'!
+                                    # grep -E matches _every line_ if 'NULL|sda|NULL'!
                                     [ -n "$device_id" ] && zfs_regexp="$device_id"
                                     if [ -n "$name" ]; then
                                         if [ -n "$zfs_regexp" ]; then
@@ -324,13 +321,13 @@ lspci -D | \
 					    elif echo "$zpool" | grep -q 'state: '; then
 						zfs_state=`echo "$zpool" | sed 's@.*: @@'`
 						shift ; shift ; shift ; shift ; shift
-					    elif echo "$zpool" | egrep -q '^raid|^mirror|^cache|^spare'; then
+					    elif echo "$zpool" | grep -E -q '^raid|^mirror|^cache|^spare'; then
 						zfs_vdev=`echo "$zpool" | sed 's@ .*@@'`
                                             elif echo "$zpool" | grep -q 'replacing'; then
                                                 replacing="rpl"`echo "$zpool" | sed "s@.*-\([0-9]\+\) .*@\1@"`
                                                 ii=1
-					    elif echo "$zpool" | egrep -q "$zfs_regexp"; then
-						if ! echo "$zpool" | egrep -q "ONLINE|AVAIL"; then
+					    elif echo "$zpool" | grep -E -q "$zfs_regexp"; then
+						if ! echo "$zpool" | grep -E -q "ONLINE|AVAIL"; then
 						    offline="!"
 						    if echo "$zpool" | grep -q "OFFLINE"; then
 							offline="$offline"O
@@ -351,7 +348,7 @@ lspci -D | \
 						fi
 
                                                 if [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]; then
-                                                    if echo "$zpool" | egrep -q "$tmpdmname"; then
+                                                    if echo "$zpool" | grep -E -q "$tmpdmname"; then
                                                         crypted="*"
                                                         have_dmcrypted=1
                                                     fi
@@ -387,7 +384,7 @@ lspci -D | \
 				if [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ]; then
 				    vg=$(cat $PVM_TEMP |
 					while read pvs; do
-					    if echo "$pvs" | egrep -q "$lvm_regexp"; then
+					    if echo "$pvs" | grep -E -q "$lvm_regexp"; then
 						echo "$pvs" | sed "s@.*,\(.*\),lvm.*@\1@"
 					    fi
 					    done)
@@ -418,10 +415,10 @@ lspci -D | \
 					    grep '^Disk /' | \
 					    sed -e "s@.*: \(.*\), .*@\1@" \
 					    -e 's@\.[0-9] @@' -e 's@ @@g'`
-					if echo "$size" | egrep -q '^[0-9][0-9][0-9][0-9]GB' && type bc > /dev/null 2>&1; then
+					if echo "$size" | grep -E -q '^[0-9][0-9][0-9][0-9]GB' && type bc > /dev/null 2>&1; then
 					    s=`echo "$size" | sed 's@GB@@'`
 					    size=`echo "scale=2; $s / 1024" | bc`"TB"
-                                        elif echo "$size" | egrep -q '^[0-9][0-9][0-9][0-9]MB' && type bc > /dev/null 2>&1; then
+                                        elif echo "$size" | grep -E -q '^[0-9][0-9][0-9][0-9]MB' && type bc > /dev/null 2>&1; then
 					    s=`echo "$size" | sed 's@MB@@'`
 					    size=`echo "scale=2; $s / 1024" | bc`"GB"
 					fi
