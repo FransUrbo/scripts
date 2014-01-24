@@ -45,16 +45,20 @@ DO_ZFS=
 if type zpool > /dev/null 2>&1; then
     DO_ZFS=1
     ZFS_TEMP=`tempfile -d /tmp -p zfs.`
-    zpool status > $ZFS_TEMP 2> /dev/null
+
+    if [ `zpool status 2>&1 | egrep -v '^no pools' | tee $ZFS_TEMP | wc -l` -lt 1 ]; then
+	rm $ZFS_TEMP
+    fi
 fi
 
 DO_PVM=
 if type pvs > /dev/null 2>&1; then
     DO_PVM=1
     PVM_TEMP=`tempfile -d /tmp -p pvm.`
-    pvs --noheadings --nosuffix --separator , \
-        >  $PVM_TEMP \
-        2> /dev/null
+
+    if [ `pvs --noheadings --nosuffix --separator , | tee $PVM_TEMP | wc -l` -lt 1 ]; then
+	rm $PVM_TEMP
+    fi
 fi
 
 DO_MD=
@@ -71,7 +75,10 @@ if type cryptsetup > /dev/null 2>&1; then
 
 	    name=`basename "$dev_path"`
 	    dev=`cryptsetup status $name | grep device: | sed 's@.*/@@'`
-	    DMCRYPT="$DMCRYPT $name:$dev"
+
+	    if [ -n "$name" -a -n "$dev" ]; then
+		DMCRYPT="$DMCRYPT $name:$dev"
+	    fi
 	done
     else
 	DO_DMCRYPT=
@@ -137,7 +144,7 @@ else
     printf "%-25s" "Serial"
     [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "Warranty"
     [ "$DO_MD" == 1 ] && printf "%-10s" "MD"
-    [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && printf "%-10s" "VG"
+    [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && printf "%-25s" "VG"
     [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]  && printf "%-25s" "DM-CRYPT"
     [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "%-30s" "  ZFS"
     printf "%8s\n\n" "Size"
@@ -236,7 +243,7 @@ lspci -D | \
 				if [ -z "$name" -o "$name" == "-" ]; then
 				    # /sys/block/*/device | grep '/0000:05:00.0/host8/'
 				    name=`ls -ln /sys/block/*/device | \
-                                        grep "/$t_id" | sed -e "s@.*block/\(.*\)/device.*@\1@"`
+                                        grep "/$t_id" | sed -e "s@.*block/\(.*\)/device .*@\1@"`
 				    if [ -z "$name" ]; then
 					name="n/a"
 				    fi
@@ -266,6 +273,7 @@ lspci -D | \
 				# ----------------------
 				# Get device name (Disk by ID)
                                 device_id=$(get_udev_info ID_SCSI_COMPAT)
+                                [ "$device_id" == 'n/a' ] && device_id=$(get_udev_info ID_ATA_COMPAT)
 
 				# ----------------------
 				# Get MD device
@@ -386,16 +394,21 @@ lspci -D | \
 
 				# ----------------------
 				# Get LVM data (VG - Virtual Group) for this disk
-				lvm_regexp="/$name"
-				[ -n "$md" -a "$md" != "n/a" ] && lvm_regexp="$lvm_regexp|$md"
 				if [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ]; then
+				    lvm_regexp="/$name"
+				    [ -n "$md" -a "$md" != "n/a" ] && lvm_regexp="$lvm_regexp|$md"
+
 				    vg=$(cat $PVM_TEMP |
 					while read pvs; do
-                                            if [[ $pvs =~ $lvm_regexp ]]; then
+					    if [[ $pvs =~ /dm- && "$DO_DMCRYPT" == 1 ]]; then
+						dm=${pvs//,*/}
+						dev=/`cryptsetup status $dm | grep device: | sed -e 's@.*/@@' -e 's@[0-9]$@@'`
+					    fi
+					    if [[ $pvs =~ $lvm_regexp || $dev =~ $lvm_regexp ]]; then
 						echo "$pvs" | sed "s@.*,\(.*\),lvm.*@\1@"
 					    fi
 					    done)
-                                    if [ -z "$vg" ]; then
+                                    if [ -z "$vg" -a -n "$md" ]; then
 					    # Double check - is it mounted
 					vg=`mount | grep "/$md" | sed "s@.* on \(.*\) type.*@\1@"`
 				    fi					    
@@ -406,7 +419,7 @@ lspci -D | \
 				# Get DM-CRYPT device mapper name
 				if [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]; then
 				    for dm_dev_name in $DMCRYPT; do
-                                        set -- ${path//:/ }
+                                        set -- ${dm_dev_name//:/ }
                                         dm_name=$1
                                         dm_dev=${2/[0-9]/}
                                         [[ $device_id =~ $dm_dev ]] && dmcrypt=${BASH_BASH_REMATCH}
@@ -496,7 +509,7 @@ lspci -D | \
                                     printf "%-25s" "$serial"
                                     [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "$warranty"
                                     [ "$DO_MD" == 1 ] && printf "%-10s" "$md"
-                                    [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && printf "%-10s" "$vg"
+                                    [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && printf "%-25s" "$vg"
                                     [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ] && printf "%-25s" "$dmcrypt"
                                     [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "%-30s" "$zfs"
                                     printf "%8s\n" "$size"
@@ -521,6 +534,6 @@ if [ "$DO_MACHINE_READABLE" == 0 ]; then
     [ "$offline_type" == "R" ] && echo "R  => Removed"
 fi
 
-[ -n "$ZFS_TEMP" ] && rm -f $ZFS_TEMP
-[ -n "$PVM_TEMP" ] && rm -f $PVM_TEMP
+[ -n "$ZFS_TEMP" -a -f "$ZFS_TEMP" ] && rm -f "$ZFS_TEMP"
+[ -n "$PVM_TEMP" -a -f "$PVM_TEMP" ] && rm -f "$PVM_TEMP"
 rm -f $TEMP_FILE
