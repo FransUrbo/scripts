@@ -192,6 +192,8 @@ lspci -D | \
 	    sort | \
 	        while read path; do
 		    path=${path/*;/}
+                    got_hosts=
+                    chk_ata=
 
 		    # ----------------------
 		    # Get HOST name
@@ -424,7 +426,7 @@ lspci -D | \
                                         if [[ $size =~ ^[0-9][0-9][0-9][0-9]GB ]] && type bc > /dev/null 2>&1; then
                                             s=${size/GB/}
 					    size=`echo "scale=2; $s / 1024" | bc`"TB"
-                                        elif [[ $size =~ '^[0-9][0-9][0-9][0-9]MB' ]] && type bc > /dev/null 2>&1; then
+                                        elif [[ $size =~ ^[0-9][0-9][0-9][0-9]MB ]] && type bc > /dev/null 2>&1; then
                                             s=${size/MB/}
 					    size=`echo "scale=2; $s / 1024" | bc`"GB"
 					fi
