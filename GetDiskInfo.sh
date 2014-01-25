@@ -314,7 +314,9 @@ lspci -D | \
 				vg='n/a'
 				if [ "$DO_LVM" == 1 ]; then
 				    lvm_regexp="/$name"
-				    [ -n "$md" -a "$md" != "n/a" ] && lvm_regexp="$lvm_regexp|$md"
+				    if [ -n "$md" -a "$md" != "n/a" ]; then
+					lvm_regexp="$lvm_regexp|"${md//\(?\)/}
+				    fi
 
 				    vg=$(cat $LVM_TEMP |
 					while read pvs; do
@@ -378,6 +380,7 @@ lspci -D | \
 					zfs_regexp="$zfs_regexp|$model-.*_$serial"
 				    fi
 				    # Make sure we only match the whole word (not 'test2' if searching for/with 'test').
+				    [[ $zfs_regexp =~ \| ]] && zfs_regexp="($zfs_regexp)"
 				    zfs_regexp=\\b$zfs_regexp\\b
 
 				    # What exactly is a VDEV?
