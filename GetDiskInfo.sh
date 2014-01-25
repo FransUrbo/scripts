@@ -298,7 +298,10 @@ lspci -D | \
 					# md3 sdg1[0] sdb1[1]
 					set -- `echo "$MD"`
 					for dev in $*; do
-					    if [[ $dev =~ ^$name ]]; then
+					    dev=${dev//\[?\]/}
+					    if [[ $dev =~ ^$name(.*) ]]; then
+						md=$1${BASH_REMATCH[1]}
+					    elif [[ $dev =~ ^$name ]]; then
 						md="$1"
 						break
 					    fi
