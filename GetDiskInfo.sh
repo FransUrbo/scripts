@@ -52,14 +52,14 @@ if type zpool > /dev/null 2>&1; then
     fi
 fi
 
-DO_PVM=
+DO_LVM=
 if type pvs > /dev/null 2>&1; then
-    DO_PVM=1
-    PVM_TEMP=`tempfile -d /tmp -p pvm.`
+    DO_LVM=1
+    LVM_TEMP=`tempfile -d /tmp -p lvm.`
 
-    if [ `pvs --noheadings --nosuffix --separator , | tee $PVM_TEMP | wc -l` -lt 1 ]; then
-	rm $PVM_TEMP
-	DO_PVM=0
+    if [ `pvs --noheadings --nosuffix --separator , | tee $LVM_TEMP | wc -l` -lt 1 ]; then
+	rm $LVM_TEMP
+	DO_LVM=0
     fi
 fi
 
@@ -102,12 +102,12 @@ DO_REV=1 ; DO_MACHINE_READABLE=0
 
 # --------------
 # Get the CLI options - override DO_* above...
-TEMP=`getopt -o h --long no-zfs,no-pvm,no-md,no-dmcrypt,no-location,no-warranty,no-rev,help,machine-readable -- "$@"`
+TEMP=`getopt -o h --long no-zfs,no-lvm,no-md,no-dmcrypt,no-location,no-warranty,no-rev,help,machine-readable -- "$@"`
 eval set -- "$TEMP"
 while true ; do
     case "$1" in
         --no-zfs)		DO_ZFS=0		; shift ;;
-        --no-pvm)		DO_PVM=0		; shift ;;
+        --no-lvm)		DO_LVM=0		; shift ;;
         --no-md)		DO_MD=0			; shift ;;
         --no-dmcrypt)		DO_DMCRYPT=0		; shift ;;
         --no-location)		DO_LOCATION=0		; shift ;;
@@ -115,7 +115,7 @@ while true ; do
         --no-rev)		DO_REV=0		; shift ;;
         --machine-readable)	DO_MACHINE_READABLE=1	; shift ;;
         --help|-h)
-	    echo "Usage: `basename $0` [--no-zfs|--no-pvm|--no-md|--no-dmcrypt|--no-location|--no-warranty|--no-rev|--machine-readable]"
+	    echo "Usage: `basename $0` [--no-zfs|--no-lvm|--no-md|--no-dmcrypt|--no-location|--no-warranty|--no-rev|--machine-readable]"
             echo
             exit 0
             ;;
@@ -134,7 +134,7 @@ if [ "$DO_MACHINE_READABLE" == 1 ]; then
     echo -n "Serial;"
     [ "$DO_WARRANTY" == 1 ] && echo -n "Warranty;"
     [ "$DO_MD" == 1 ] && echo -n "MD;"
-    [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && echo -n "VG;"
+    [ "$DO_LVM" == 1 -a -f "$LVM_TEMP" ] && echo -n "VG;"
     [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]  && echo -n "DM-CRYPT;"
     [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && echo -n "ZFS;"
     echo "Size"
@@ -146,7 +146,7 @@ else
     printf "%-25s" "Serial"
     [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "Warranty"
     [ "$DO_MD" == 1 ] && printf "%-10s" "MD"
-    [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && printf "%-25s" "VG"
+    [ "$DO_LVM" == 1 -a -f "$LVM_TEMP" ] && printf "%-25s" "VG"
     [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]  && printf "%-25s" "DM-CRYPT"
     [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "%-30s" "  ZFS"
     printf "%8s\n\n" "Size"
@@ -310,11 +310,11 @@ lspci -D | \
 
 				# ----------------------
 				# Get LVM data (VG - Virtual Group) for this disk
-				if [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ]; then
+				if [ "$DO_LVM" == 1 -a -f "$LVM_TEMP" ]; then
 				    lvm_regexp="/$name"
 				    [ -n "$md" -a "$md" != "n/a" ] && lvm_regexp="$lvm_regexp|$md"
 
-				    vg=$(cat $PVM_TEMP |
+				    vg=$(cat $LVM_TEMP |
 					while read pvs; do
 					    dm= ; dev=
 					    if [[ $pvs =~ /dm- && "$DO_DMCRYPT" == 1 ]]; then
@@ -365,7 +365,7 @@ lspci -D | \
                                             zfs_regexp="$dmcrypt"
                                         fi
 				    fi
-				    if [ "$DO_PVM" == 1 -a "$vg" != 'n/a' ]; then
+				    if [ "$DO_LVM" == 1 -a "$vg" != 'n/a' ]; then
                                         if [ -n "$zfs_regexp" ]; then
                                             zfs_regexp="$zfs_regexp|$vg"
                                         else
@@ -539,7 +539,7 @@ lspci -D | \
                                     echo -n "$serial;"
                                     [ "$DO_WARRANTY" == 1 ] && echo -n "$warranty;"
                                     [ "$DO_MD" == 1 ] && echo -n "$md;"
-                                    [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && echo -n "$vg;"
+                                    [ "$DO_LVM" == 1 -a -f "$LVM_TEMP" ] && echo -n "$vg;"
                                     [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ] && echo -n "$dmcrypt;"
                                     [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && echo -n "$zfs;"
                                     echo "$size"
@@ -551,7 +551,7 @@ lspci -D | \
                                     printf "%-25s" "$serial"
                                     [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "$warranty"
                                     [ "$DO_MD" == 1 ] && printf "%-10s" "$md"
-                                    [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ] && printf "%-25s" "$vg"
+                                    [ "$DO_LVM" == 1 -a -f "$LVM_TEMP" ] && printf "%-25s" "$vg"
                                     [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ] && printf "%-25s" "$dmcrypt"
                                     [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "%-30s" "$zfs"
                                     printf "%8s\n" "$size"
@@ -577,5 +577,5 @@ if [ "$DO_MACHINE_READABLE" == 0 ]; then
 fi
 
 [ -n "$ZFS_TEMP" -a -f "$ZFS_TEMP" ] && rm -f "$ZFS_TEMP"
-[ -n "$PVM_TEMP" -a -f "$PVM_TEMP" ] && rm -f "$PVM_TEMP"
+[ -n "$LVM_TEMP" -a -f "$LVM_TEMP" ] && rm -f "$LVM_TEMP"
 rm -f $TEMP_FILE
