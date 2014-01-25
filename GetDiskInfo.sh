@@ -279,8 +279,8 @@ lspci -D | \
 
 				# ----------------------
 				# Get DM-CRYPT device mapper name
+				dmcrypt='n/a'
 				if [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]; then
-				    dmcrypt=
 				    for dm_dev_name in $DMCRYPT; do
                                         set -- ${dm_dev_name//:/ }
                                         dm_name=$1
@@ -288,11 +288,11 @@ lspci -D | \
                                         [[ $device_id =~ $dm_dev ]] && dmcrypt=${BASH_BASH_REMATCH}
                                         [ "$name" == "$dm_dev" ] && dmcrypt=$dm_name
 				    done
-                                    [ -z "$dmcrypt" ] && dmcrypt="n/a"
 				fi
 
 				# ----------------------
 				# Get MD device
+                                md='n/a'
 				if [ "$DO_MD" == 1 ]; then
 				    MD=`grep $name /proc/mdstat | sed 's@: active raid1 @@'`
 				    if [ -n "$MD" ]; then
@@ -305,11 +305,11 @@ lspci -D | \
 					    fi
 					done
 				    fi
-				    [ -z "$md" ] && md="n/a"
 				fi
 
 				# ----------------------
 				# Get LVM data (VG - Virtual Group) for this disk
+                                vg='n/a'
 				if [ "$DO_LVM" == 1 ]; then
 				    lvm_regexp="/$name"
 				    [ -n "$md" -a "$md" != "n/a" ] && lvm_regexp="$lvm_regexp|$md"
@@ -329,7 +329,6 @@ lspci -D | \
 					# Double check - is it mounted
 					vg=`mount | grep "/$md" | sed "s@.* on \(.*\) type.*@\1@"`
 				    fi
-                                    [ -z "$vg" ] && vg="n/a"
 				fi
 
 				# ----------------------
@@ -402,12 +401,11 @@ lspci -D | \
                                             elif [[ $zpool =~ $vdev_regexp ]]; then
 						zpool=${zpool#"${zpool%%[![:space:]]*}"} # Strip leading spaces
                                                 zfs_vdev=${zpool/ */}
-
 						# Somewhat ugly - this matches VDEVs that is a DEV
 						if [[ ! $zfs_vdev =~ raid|mirror|cache|spare
-						      && $zpool =~ $zfs_regexp
-						      && -n "$zfs_name"
-						      && -n "$zfs_vdev" ]]
+						        && $zpool =~ $zfs_regexp
+						        && -n "$zfs_name"
+						        && -n "$zfs_vdev" ]]
 						then
 						    printf "$crypted %-17s$stat" "$zfs_name / $zfs_vdev"
 						    break
