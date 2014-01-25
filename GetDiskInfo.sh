@@ -41,7 +41,7 @@
 
 # --------------
 # Set/figure out default output information
-DO_ZFS=
+DO_ZFS=0
 if type zpool > /dev/null 2>&1; then
     DO_ZFS=1
     ZFS_TEMP=`tempfile -d /tmp -p zfs.`
@@ -52,7 +52,7 @@ if type zpool > /dev/null 2>&1; then
     fi
 fi
 
-DO_LVM=
+DO_LVM=0
 if type pvs > /dev/null 2>&1; then
     DO_LVM=1
     LVM_TEMP=`tempfile -d /tmp -p lvm.`
@@ -63,7 +63,7 @@ if type pvs > /dev/null 2>&1; then
     fi
 fi
 
-DO_MD=
+DO_MD=0
 [ -f "/proc/mdstat" ] && DO_MD=1
 
 if type cryptsetup > /dev/null 2>&1; then
@@ -83,16 +83,16 @@ if type cryptsetup > /dev/null 2>&1; then
 	    fi
 	done
     else
-	DO_DMCRYPT=
+	DO_DMCRYPT=0
     fi
 fi
 
-DO_LOCATION=
+DO_LOCATION=0
 if [ -f $HOME/.disks_physical_location ]; then
     DO_LOCATION=1
 fi
 
-DO_WARRANTY=
+DO_WARRANTY=0
 if [ -f $HOME/.disks_serial+warranty ]; then
     DO_WARRANTY=1
 fi
@@ -134,9 +134,9 @@ if [ "$DO_MACHINE_READABLE" == 1 ]; then
     echo -n "Serial;"
     [ "$DO_WARRANTY" == 1 ] && echo -n "Warranty;"
     [ "$DO_MD" == 1 ] && echo -n "MD;"
-    [ "$DO_LVM" == 1 -a -f "$LVM_TEMP" ] && echo -n "VG;"
+    [ "$DO_LVM" == 1 ] && echo -n "VG;"
     [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]  && echo -n "DM-CRYPT;"
-    [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && echo -n "ZFS;"
+    [ "$DO_ZFS" == 1 ] && echo -n "ZFS;"
     echo "Size"
 else
     printf "  %-15s" "Host" 
@@ -146,9 +146,9 @@ else
     printf "%-25s" "Serial"
     [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "Warranty"
     [ "$DO_MD" == 1 ] && printf "%-10s" "MD"
-    [ "$DO_LVM" == 1 -a -f "$LVM_TEMP" ] && printf "%-25s" "VG"
+    [ "$DO_LVM" == 1 ] && printf "%-25s" "VG"
     [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]  && printf "%-25s" "DM-CRYPT"
-    [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "%-30s" "  ZFS"
+    [ "$DO_ZFS" == 1 ] && printf "%-30s" "  ZFS"
     printf "%8s\n\n" "Size"
 fi
 
@@ -310,7 +310,7 @@ lspci -D | \
 
 				# ----------------------
 				# Get LVM data (VG - Virtual Group) for this disk
-				if [ "$DO_LVM" == 1 -a -f "$LVM_TEMP" ]; then
+				if [ "$DO_LVM" == 1 ]; then
 				    lvm_regexp="/$name"
 				    [ -n "$md" -a "$md" != "n/a" ] && lvm_regexp="$lvm_regexp|$md"
 
@@ -334,7 +334,7 @@ lspci -D | \
 
 				# ----------------------
 				# Get ZFS pool data for this disk ID
-				if [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ]; then
+				if [ "$DO_ZFS" == 1 ]; then
 				    zfs_regexp=
 
 				    # OID: SATA_Corsair_Force_311486508000008952122
@@ -539,9 +539,9 @@ lspci -D | \
                                     echo -n "$serial;"
                                     [ "$DO_WARRANTY" == 1 ] && echo -n "$warranty;"
                                     [ "$DO_MD" == 1 ] && echo -n "$md;"
-                                    [ "$DO_LVM" == 1 -a -f "$LVM_TEMP" ] && echo -n "$vg;"
+                                    [ "$DO_LVM" == 1 ] && echo -n "$vg;"
                                     [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ] && echo -n "$dmcrypt;"
-                                    [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && echo -n "$zfs;"
+                                    [ "$DO_ZFS" == 1 ] && echo -n "$zfs;"
                                     echo "$size"
                                 else
 				    printf "  %-15s" "$host"
@@ -551,9 +551,9 @@ lspci -D | \
                                     printf "%-25s" "$serial"
                                     [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "$warranty"
                                     [ "$DO_MD" == 1 ] && printf "%-10s" "$md"
-                                    [ "$DO_LVM" == 1 -a -f "$LVM_TEMP" ] && printf "%-25s" "$vg"
+                                    [ "$DO_LVM" == 1 ] && printf "%-25s" "$vg"
                                     [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ] && printf "%-25s" "$dmcrypt"
-                                    [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ] && printf "%-30s" "$zfs"
+                                    [ "$DO_ZFS" == 1 ] && printf "%-30s" "$zfs"
                                     printf "%8s\n" "$size"
                                 fi
 			    done # => 'while read block; do'
@@ -576,6 +576,6 @@ if [ "$DO_MACHINE_READABLE" == 0 ]; then
     [ "$offline_type" == "R" ] && echo "R  => Removed"
 fi
 
-[ -n "$ZFS_TEMP" -a -f "$ZFS_TEMP" ] && rm -f "$ZFS_TEMP"
-[ -n "$LVM_TEMP" -a -f "$LVM_TEMP" ] && rm -f "$LVM_TEMP"
+[ -f "$ZFS_TEMP" ] && rm -f "$ZFS_TEMP"
+[ -f "$LVM_TEMP" ] && rm -f "$LVM_TEMP"
 rm -f $TEMP_FILE
