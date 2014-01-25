@@ -48,6 +48,7 @@ if type zpool > /dev/null 2>&1; then
 
     if [ `zpool status 2>&1 | egrep -v '^no pools' | tee $ZFS_TEMP | wc -l` -lt 1 ]; then
 	rm $ZFS_TEMP
+	DO_ZFS=0
     fi
 fi
 
@@ -58,6 +59,7 @@ if type pvs > /dev/null 2>&1; then
 
     if [ `pvs --noheadings --nosuffix --separator , | tee $PVM_TEMP | wc -l` -lt 1 ]; then
 	rm $PVM_TEMP
+	DO_PVM=0
     fi
 fi
 
@@ -276,6 +278,20 @@ lspci -D | \
                                 [ "$device_id" == 'n/a' ] && device_id=$(get_udev_info ID_ATA_COMPAT)
 
 				# ----------------------
+				# Get DM-CRYPT device mapper name
+				if [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]; then
+				    dmcrypt=
+				    for dm_dev_name in $DMCRYPT; do
+                                        set -- ${dm_dev_name//:/ }
+                                        dm_name=$1
+                                        dm_dev=${2/[0-9]/}
+                                        [[ $device_id =~ $dm_dev ]] && dmcrypt=${BASH_BASH_REMATCH}
+                                        [ "$name" == "$dm_dev" ] && dmcrypt=$dm_name
+				    done
+                                    [ -z "$dmcrypt" ] && dmcrypt="n/a"
+				fi
+
+				# ----------------------
 				# Get MD device
 				if [ "$DO_MD" == 1 ]; then
 				    MD=`grep $name /proc/mdstat | sed 's@: active raid1 @@'`
@@ -293,55 +309,117 @@ lspci -D | \
 				fi
 
 				# ----------------------
+				# Get LVM data (VG - Virtual Group) for this disk
+				if [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ]; then
+				    lvm_regexp="/$name"
+				    [ -n "$md" -a "$md" != "n/a" ] && lvm_regexp="$lvm_regexp|$md"
+
+				    vg=$(cat $PVM_TEMP |
+					while read pvs; do
+					    dm= ; dev=
+					    if [[ $pvs =~ /dm- && "$DO_DMCRYPT" == 1 ]]; then
+						dm=${pvs//,*/}
+						dev=/`cryptsetup status $dm | grep device: | sed -e 's@.*/@@' -e 's@[0-9]$@@'`
+					    fi
+					    if [[ $pvs =~ $lvm_regexp || $dev =~ $lvm_regexp ]]; then
+						echo "$pvs" | sed "s@.*,\(.*\),lvm.*@\1@"
+					    fi
+					done)
+                                    if [ -z "$vg" -a "$md" != "n/a" ]; then
+					# Double check - is it mounted
+					vg=`mount | grep "/$md" | sed "s@.* on \(.*\) type.*@\1@"`
+				    fi
+                                    [ -z "$vg" ] && vg="n/a"
+				fi
+
+				# ----------------------
 				# Get ZFS pool data for this disk ID
 				if [ "$DO_ZFS" == 1 -a -f "$ZFS_TEMP" ]; then
+				    zfs_regexp=
+
 				    # OID: SATA_Corsair_Force_311486508000008952122
 				    # ZFS: ata-Corsair_Force_3_SSD_11486508000008952122
                                     tmpnam=${device_id/SATA_/}
 
                                     # Setup a matching string.
                                     # grep -E matches _every line_ if 'NULL|sda|NULL'!
-                                    [ -n "$device_id" ] && zfs_regexp="$device_id"
-                                    if [ -n "$name" ]; then
+                                    [ "$device_id" != 'n/a' ] && zfs_regexp="$device_id"
+                                    if [ "$name" != 'n/a' ]; then
                                         if [ -n "$zfs_regexp" ]; then
                                             zfs_regexp="$zfs_regexp|$name"
                                         else
                                             zfs_regexp="$name"
                                         fi
                                     fi
-                                    if [ -n "$tmpnam" ]; then
+                                    if [ "$tmpnam" != 'n/a' ]; then
                                         if [ -n "$zfs_regexp" ]; then
                                             zfs_regexp="$zfs_regexp|$tmpnam"
                                         else
                                             zfs_regexp="$tmpnam"
                                         fi
                                     fi
-				    if [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]; then
-					for dm_dev_name in $DMCRYPT; do
-                                            if [[ $dm_dev_name =~ :$name ]]; then
-                                                tmpdmname=${dm_dev_name/:*/}
-						zfs_regexp="$zfs_regexp|$tmpdmname"
-					    fi
-					done
+				    if [ "$DO_DMCRYPT" == 1 -a "$dmcrypt" != 'n/a' ]; then
+                                        if [ -n "$zfs_regexp" ]; then
+                                            zfs_regexp="$zfs_regexp|$dmcrypt"
+                                        else
+                                            zfs_regexp="$dmcrypt"
+                                        fi
 				    fi
-                                    if [ -n "$model" -a -n "$serial" ]; then
+				    if [ "$DO_PVM" == 1 -a "$vg" != 'n/a' ]; then
+                                        if [ -n "$zfs_regexp" ]; then
+                                            zfs_regexp="$zfs_regexp|$vg"
+                                        else
+                                            zfs_regexp="$vg"
+                                        fi
+				    fi
+                                    if [ "$model" != 'n/a' -a "$serial" != 'n/a' ]; then
                                         zfs_regexp="$zfs_regexp|$model-.*_$serial"
                                     fi
-                                    
+				    # Make sure we only match the whole word (not 'test2' if searching for/with 'test').
+				    zfs_regexp=\\b$zfs_regexp\\b
+
+				    # What exactly is a VDEV?
+				    vdev_regexp="^	  [a-zA-Z0-9]|raid|mirror|cache|spare"
+
 				    zfs=$(cat $ZFS_TEMP | 
-					while read zpool; do
-                                            offline="" ; crypted=" "
+					while IFS= read zpool; do # IFS => need the leading spaces
+                                            offline="" ; crypted=" " ; stat=""
+
+					    # Base values
                                             if [[ $zpool =~ 'pool: ' ]]; then
                                                 zfs_name=${zpool/*: /}
+						continue
                                             elif [[ $zpool =~ 'state: ' ]]; then
                                                 zfs_state=${zpool/*: /}
-						shift ; shift ; shift ; shift ; shift
-                                            elif [[ $zpool =~ ^raid|^mirror|^cache|^spare ]]; then
+						# Skip to the interesting bits
+						while read zpool; do
+						    if [[ $zpool =~ NAME.*STATE.*READ.*WRITE.*CKSUM ]]; then
+							continue 2
+						    fi
+						done
+
+					    # VDEV type
+                                            elif [[ $zpool =~ $vdev_regexp ]]; then
+						zpool=${zpool#"${zpool%%[![:space:]]*}"} # Strip leading spaces
                                                 zfs_vdev=${zpool/ */}
+
+						# Somewhat ugly - this matches VDEVs that is a DEV
+						if [[ ! $zfs_vdev =~ raid|mirror|cache|spare
+						      && $zpool =~ $zfs_regexp
+						      && -n "$zfs_name"
+						      && -n "$zfs_vdev" ]]
+						then
+						    printf "$crypted %-17s$stat" "$zfs_name / $zfs_vdev"
+						    break
+						fi
                                             elif [[ $zpool =~ replacing ]]; then
                                                 replacing="rpl"`echo "$zpool" | sed "s@.*-\([0-9]\+\) .*@\1@"`
                                                 ii=1
+						continue
+
+					    # DEV
                                             elif [[ $zpool =~ $zfs_regexp ]]; then
+						# Device status
                                                 if [[ ! $zpool =~ ONLINE|AVAIL ]]; then
 						    offline="!"
                                                     if [[ $zpool =~ OFFLINE ]]; then
@@ -377,7 +455,7 @@ lspci -D | \
                                                     stat="$offline"
                                                 fi
 
-						if [ "x$zfs_name" != "" -a "$zfs_vdev" != "" ]; then
+						if [ -n "$zfs_name" -a -n "$zfs_vdev" ]; then
 						    printf "$crypted %-17s$stat" "$zfs_name / $zfs_vdev"
 						fi
 					    fi
@@ -388,44 +466,8 @@ lspci -D | \
                                             else
                                                 ii=$[ $ii + 1 ]
                                             fi
-					    done)
+					done)
 				    [ -z "$zfs" ] && zfs="  n/a"
-				fi
-
-				# ----------------------
-				# Get LVM data (VG - Virtual Group) for this disk
-				if [ "$DO_PVM" == 1 -a -f "$PVM_TEMP" ]; then
-				    lvm_regexp="/$name"
-				    [ -n "$md" -a "$md" != "n/a" ] && lvm_regexp="$lvm_regexp|$md"
-
-				    vg=$(cat $PVM_TEMP |
-					while read pvs; do
-					    if [[ $pvs =~ /dm- && "$DO_DMCRYPT" == 1 ]]; then
-						dm=${pvs//,*/}
-						dev=/`cryptsetup status $dm | grep device: | sed -e 's@.*/@@' -e 's@[0-9]$@@'`
-					    fi
-					    if [[ $pvs =~ $lvm_regexp || $dev =~ $lvm_regexp ]]; then
-						echo "$pvs" | sed "s@.*,\(.*\),lvm.*@\1@"
-					    fi
-					    done)
-                                    if [ -z "$vg" -a -n "$md" ]; then
-					    # Double check - is it mounted
-					vg=`mount | grep "/$md" | sed "s@.* on \(.*\) type.*@\1@"`
-				    fi					    
-                                    [ -z "$vg" ] && vg="n/a"
-				fi
-
-				# ----------------------
-				# Get DM-CRYPT device mapper name
-				if [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]; then
-				    for dm_dev_name in $DMCRYPT; do
-                                        set -- ${dm_dev_name//:/ }
-                                        dm_name=$1
-                                        dm_dev=${2/[0-9]/}
-                                        [[ $device_id =~ $dm_dev ]] && dmcrypt=${BASH_BASH_REMATCH}
-                                        [ "$name" == "$dm_dev" ] && dmcrypt=$dm_name
-				    done
-                                    [ -z "$dmcrypt" ] && dmcrypt="n/a"
 				fi
 
 				# ----------------------
