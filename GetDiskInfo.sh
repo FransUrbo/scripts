@@ -240,7 +240,7 @@ lspci -D | \
 				name=
 				if [[ $t_id =~ ^[0-9] ]] && type lsscsi > /dev/null 2>&1; then
 				    lsscsi_out=`lsscsi --device "$t_id"`
-				    if ! echo "$lsscsi_out" | grep -qi 'disk'; then
+				    if ! echo "$lsscsi_out" | grep -Eqi 'disk|dvd|cd|tape'; then
 					continue
 				    fi
 
