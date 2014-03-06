@@ -252,7 +252,9 @@ lspci -D | \
 
 				# ----------------------
 				# Get all info availible for $name
-				udevadm info -q all -p /sys/block/$name > $TEMP_FILE
+				if [ -n "$name" -a "$name" != "n/a" ]; then
+				    udevadm info -q all -p /sys/block/$name > $TEMP_FILE
+				fi
 
 				# ----------------------
 				# Get dev path
