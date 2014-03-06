@@ -98,11 +98,11 @@ if [ -f $HOME/.disks_serial+warranty ]; then
 fi
 
 TEMP_FILE=`tempfile -d /tmp -p dsk.`
-DO_REV=1 ; DO_MACHINE_READABLE=0
+DO_REV=1 ; DO_MACHINE_READABLE=0 ; DO_WWN=0
 
 # --------------
 # Get the CLI options - override DO_* above...
-TEMP=`getopt -o h --long no-zfs,no-lvm,no-md,no-dmcrypt,no-location,no-warranty,no-rev,help,machine-readable -- "$@"`
+TEMP=`getopt -o h --long no-zfs,no-lvm,no-md,no-dmcrypt,no-location,no-warranty,no-rev,help,machine-readable,use-wwn -- "$@"`
 eval set -- "$TEMP"
 while true ; do
     case "$1" in
@@ -114,6 +114,7 @@ while true ; do
 	--no-warranty)		DO_WARRANTY=0		; shift ;;
 	--no-rev)		DO_REV=0		; shift ;;
 	--machine-readable)	DO_MACHINE_READABLE=1	; shift ;;
+	--use-wwn)		DO_WWN=1		; shift ;;
 	--help|-h)
 	    echo "Usage: `basename $0` [--no-zfs|--no-lvm|--no-md|--no-dmcrypt|--no-location|--no-warranty|--no-rev|--machine-readable]"
 	    echo
@@ -280,7 +281,10 @@ lspci -D | \
 
 				# ----------------------
 				# Get device name (Disk by ID)
-				device_id=$(get_udev_info ID_SCSI_COMPAT)
+				if [ "$DO_WWN" == 1 ]; then
+				    device_id=$(get_udev_info ID_WWN)
+				fi
+				[ "$device_id" == 'n/a' ] && device_id=$(get_udev_info ID_SCSI_COMPAT)
 				[ "$device_id" == 'n/a' ] && device_id=$(get_udev_info ID_ATA_COMPAT)
 				if [ "$device_id" == 'n/a' -a -n "$dev_path" -a "$dev_path" != "n/a" ] \
 					&& type smartctl > /dev/null 2>&1
