@@ -239,7 +239,12 @@ lspci -D | \
 				# Get name
 				name=
 				if [[ $t_id =~ ^[0-9] ]] && type lsscsi > /dev/null 2>&1; then
-				    name=`lsscsi --device "$t_id" | sed -e 's@.*/@@' -e 's@ \[.*@@' -e 's@\[.*@@'`
+				    lsscsi_out=`lsscsi --device "$t_id"`
+				    if echo "$lsscsi_out" | grep -qi expander; then
+					continue
+				    fi
+
+				    name=`echo "$lsscsi_out" | sed -e 's@.*/@@' -e 's@ \[.*@@' -e 's@\[.*@@'`
 				fi
 				if [ -z "$name" -o "$name" == "-" ]; then
 				    # /sys/block/*/device | grep '/0000:05:00.0/host8/'
