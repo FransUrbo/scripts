@@ -283,13 +283,15 @@ lspci -D | \
 				device_id=$(get_udev_info ID_SCSI_COMPAT)
 				[ "$device_id" == 'n/a' ] && device_id=$(get_udev_info ID_ATA_COMPAT)
 				if [ "$device_id" == 'n/a' -a -n "$dev_path" -a "$dev_path" != "n/a" ] \
-				  && type smartctl > /dev/null 2>&1
+					&& type smartctl > /dev/null 2>&1
 				then
 				    # No match. Let's try smartctl instead then. Unfortunatly, the type
 				    # of info isn't availible 'as is', so we have to wing it a little.
 				    set -- `smartctl -a $dev_path | grep -E '^Device Model:|^Serial Number:' | \
 					sed -e "s@.* \(.*\).*@\1@" -e "s@-.*@@"`
-				    device_id=$(/bin/ls -l /dev/disk/by-id/scsi*$1*$2 | sed "s@.*scsi-\(.*\) -.*@\1@")
+				    if [ -n "$1" -a -n "$2" ]; then
+					device_id=$(/bin/ls -l /dev/disk/by-id/scsi*$1*$2 | sed "s@.*scsi-\(.*\) -.*@\1@")
+				    fi
 				fi
 
 				# ----------------------
