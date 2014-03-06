@@ -130,7 +130,12 @@ done
 if [ "$DO_MACHINE_READABLE" == 1 ]; then
     echo -n "CTRL;Host;"
     [ "$DO_LOCATION" == 1 ] && echo -n "PHY;"
-    echo -n "Name;Model;Device by ID;"
+    echo -n "Name;Model;"
+    if [ "$DO_WWN" == 0 ]; then
+	echo "Device by ID;"
+    else
+	echo "Device by WWN;"
+    fi
     [ "$DO_REV" == 1 ] && echo -n "Rev;"
     echo -n "Serial;"
     [ "$DO_WARRANTY" == 1 ] && echo -n "Warranty;"
@@ -142,7 +147,12 @@ if [ "$DO_MACHINE_READABLE" == 1 ]; then
 else
     printf "  %-15s" "Host" 
     [ "$DO_LOCATION" == 1 ] && printf "%-4s" "PHY"
-    printf " %-4s %-20s%-45s" "Name" "Model" "Device by ID"
+    printf " %-4s %-20s" "Name" "Model"
+    if [ "$DO_WWN" == 0 ]; then
+	printf "%-45s" "Device by ID"
+    else
+	printf "%-45s" "Device by WWN"
+    fi
     [ "$DO_REV" == 1 ] && printf "%-10s" "Rev"
     printf "%-25s" "Serial"
     [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "Warranty"
