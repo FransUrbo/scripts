@@ -287,7 +287,8 @@ lspci -D | \
 
 				# ----------------------
 				# Get serial number
-				serial=$(get_udev_info ID_SERIAL_SHORT)
+				serial=$(get_udev_info ID_SCSI_SERIAL)
+				[ "$serial" == "n/a" ] && serial=$(get_udev_info ID_SERIAL_SHORT)
 
 				# ----------------------
 				# Get device name (Disk by ID)
