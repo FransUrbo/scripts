@@ -293,6 +293,8 @@ lspci -D | \
 				# Get device name (Disk by ID)
 				if [ "$DO_WWN" == 1 ]; then
 				    device_id=$(get_udev_info ID_WWN)
+				else
+				    device_id="n/a"
 				fi
 				[ "$device_id" == 'n/a' ] && device_id=$(get_udev_info ID_SCSI_COMPAT)
 				[ "$device_id" == 'n/a' ] && device_id=$(get_udev_info ID_ATA_COMPAT)
