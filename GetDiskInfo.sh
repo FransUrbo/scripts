@@ -9,7 +9,7 @@
 # 
 # The following command is not required, but they should really
 # exist for best usage:
-#   lsscsi, fdisk
+#   lsscsi, fdisk, smartctl
 # 
 # The following command is required (won't work without it!):
 #   lspci, tempfile, getopt, basename, grep, find, cat, ls,
@@ -239,7 +239,12 @@ lspci -D | \
 				# Get name
 				name=
 				if [[ $t_id =~ ^[0-9] ]] && type lsscsi > /dev/null 2>&1; then
-				    name=`lsscsi --device "$t_id" | sed -e 's@.*/@@' -e 's@ \[.*@@' -e 's@\[.*@@'`
+				    lsscsi_out=`lsscsi --device "$t_id"`
+				    if ! echo "$lsscsi_out" | grep -Eqi 'disk|dvd|cd|tape'; then
+					continue
+				    fi
+
+				    name=`echo "$lsscsi_out" | sed -e 's@.*/@@' -e 's@ \[.*@@' -e 's@\[.*@@'`
 				fi
 				if [ -z "$name" -o "$name" == "-" ]; then
 				    # /sys/block/*/device | grep '/0000:05:00.0/host8/'
@@ -252,7 +257,9 @@ lspci -D | \
 
 				# ----------------------
 				# Get all info availible for $name
-				udevadm info -q all -p /sys/block/$name > $TEMP_FILE
+				if [ -n "$name" -a "$name" != "n/a" ]; then
+				    udevadm info -q all -p /sys/block/$name > $TEMP_FILE
+				fi
 
 				# ----------------------
 				# Get dev path
@@ -275,6 +282,15 @@ lspci -D | \
 				# Get device name (Disk by ID)
 				device_id=$(get_udev_info ID_SCSI_COMPAT)
 				[ "$device_id" == 'n/a' ] && device_id=$(get_udev_info ID_ATA_COMPAT)
+				if [ "$device_id" == 'n/a' -a -n "$dev_path" -a "$dev_path" != "n/a" ] \
+				  && type smartctl > /dev/null 2>&1
+				then
+				    # No match. Let's try smartctl instead then. Unfortunatly, the type
+				    # of info isn't availible 'as is', so we have to wing it a little.
+				    set -- `smartctl -a $dev_path | grep -E '^Device Model:|^Serial Number:' | \
+					sed -e "s@.* \(.*\).*@\1@" -e "s@-.*@@"`
+				    device_id=$(/bin/ls -l /dev/disk/by-id/scsi*$1*$2 | sed "s@.*scsi-\(.*\) -.*@\1@")
+				fi
 
 				# ----------------------
 				# Get DM-CRYPT device mapper name
