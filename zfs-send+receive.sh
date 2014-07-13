@@ -48,7 +48,7 @@ function main {
     progres=$(/bin/ps faxwww | grep -w "${local_snap%@*}\"" | grep -v grep | wc -l)
 
     if [[ -n "$DEBUG" ]]; then
-	echo "zfs send \"$local_snap\" | ssh $SSH_OPTS $SSH_HOST zfs receive -uvF \"$dset\""
+	echo "zfs send -p \"$local_snap\" | ssh $SSH_OPTS $SSH_HOST zfs receive -uvF \"$dset\""
     elif [[ -z "$local_snap" ]]; then
 	return 1
     elif [[ -z "$remote_snap" || "$local_snap" != "$remote_snap" ]] && [[ "$progres" == 0 ]]; then
@@ -58,7 +58,7 @@ function main {
 
 	if [ -z "$PORT" ]; then
 	    # Simple, no-nonsence send | receive
-	    zfs send "$local_snap" | \
+	    zfs send -p "$local_snap" | \
 		ssh $SSH_OPTS $SSH_HOST zfs receive -uvF \"$dset\"
 	    if [ "$?" != "0" ]; then
 		((snap_nr += 1))
@@ -76,7 +76,7 @@ function main {
 	    pid=$(/bin/ps faxwww | egrep "ssh .* nc .* zfs receive .*$DSET" | grep -v 'grep ' | sed 's@ [a-z].*@@')
 
 	    # Send the snapshot to netcat, which sends it to netcat on the receiver.
-	    zfs send "$local_snap" | nc -nw5 $SSH_HOST $PORT
+	    zfs send -p "$local_snap" | nc -nw5 $SSH_HOST $PORT
 
 	    # Cleanup local and remote (kill all process regarding this snapshot).
 	    # - netcat doesn't shutdown after the send/receive is completed...
