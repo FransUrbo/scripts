@@ -44,9 +44,9 @@
 DO_ZFS=0
 if type zpool > /dev/null 2>&1; then
     DO_ZFS=1
-    ZFS_TEMP=`tempfile -d /tmp -p zfs.`
+    ZFS_TEMP=$(tempfile -d /tmp -p zfs.)
 
-    if [ `zpool status 2>&1 | egrep -v '^no pools' | tee $ZFS_TEMP | wc -l` -lt 1 ]; then
+    if [ $(zpool status 2>&1 | egrep -v '^no pools' | tee $ZFS_TEMP | wc -l) -lt 1 ]; then
 	rm $ZFS_TEMP
 	DO_ZFS=0
     fi
@@ -55,9 +55,9 @@ fi
 DO_LVM=0
 if type pvs > /dev/null 2>&1; then
     DO_LVM=1
-    LVM_TEMP=`tempfile -d /tmp -p lvm.`
+    LVM_TEMP=$(tempfile -d /tmp -p lvm.)
 
-    if [ `pvs --noheadings --nosuffix --separator , | tee $LVM_TEMP | wc -l` -lt 1 ]; then
+    if [ $(pvs --noheadings --nosuffix --separator , | tee $LVM_TEMP | wc -l) -lt 1 ]; then
 	rm $LVM_TEMP
 	DO_LVM=0
     fi
@@ -75,8 +75,8 @@ if type cryptsetup > /dev/null 2>&1; then
 	for dev_path in /dev/mapper/*; do
 	    [ "$dev_path" == "/dev/mapper/control" ] && continue
 
-	    name=`basename "$dev_path"`
-	    dev=`cryptsetup status $name | grep device: | sed 's@.*/@@'`
+	    name=$(basename "$dev_path")
+	    dev=$(cryptsetup status $name | grep device: | sed 's@.*/@@')
 
 	    if [ -n "$name" -a -n "$dev" ]; then
 		DMCRYPT="$DMCRYPT $name:$dev"
@@ -97,12 +97,12 @@ if [ -f $HOME/.disks_serial+warranty ]; then
     DO_WARRANTY=1
 fi
 
-TEMP_FILE=`tempfile -d /tmp -p dsk.`
-DO_REV=1 ; DO_MACHINE_READABLE=0 ; DO_WWN=0
+TEMP_FILE=$(tempfile -d /tmp -p dsk.)
+DO_REV=1 ; DO_MACHINE_READABLE=0 ; DO_WWN=0 ; DO_SERIAL=1
 
 # --------------
 # Get the CLI options - override DO_* above...
-TEMP=`getopt -o h --long no-zfs,no-lvm,no-md,no-dmcrypt,no-location,no-warranty,no-rev,help,machine-readable,use-wwn -- "$@"`
+TEMP=$(getopt -o h --long no-zfs,no-lvm,no-md,no-dmcrypt,no-location,no-warranty,no-rev,no-serial,help,machine-readable,use-wwn -- "$@")
 eval set -- "$TEMP"
 while true ; do
     case "$1" in
@@ -113,10 +113,11 @@ while true ; do
 	--no-location)		DO_LOCATION=0		; shift ;;
 	--no-warranty)		DO_WARRANTY=0		; shift ;;
 	--no-rev)		DO_REV=0		; shift ;;
+	--no-serial)		DO_SERIAL=0		; shift ;;
 	--machine-readable)	DO_MACHINE_READABLE=1	; shift ;;
 	--use-wwn)		DO_WWN=1		; shift ;;
 	--help|-h)
-	    echo "Usage: `basename $0` [--no-zfs|--no-lvm|--no-md|--no-dmcrypt|--no-location|--no-warranty|--no-rev|--machine-readable]"
+	    echo "Usage: `basename $0` [--no-zfs|--no-lvm|--no-md|--no-dmcrypt|--no-location|--no-warranty|--no-rev|--no-serial|--machine-readable]"
 	    echo
 	    exit 0
 	    ;;
@@ -137,12 +138,13 @@ if [ "$DO_MACHINE_READABLE" == 1 ]; then
 	echo "Device by WWN;"
     fi
     [ "$DO_REV" == 1 ] && echo -n "Rev;"
-    echo -n "Serial;"
+    [ "$DO_SERIAL" == 1 ] && echo -n "Serial;"
     [ "$DO_WARRANTY" == 1 ] && echo -n "Warranty;"
     [ "$DO_MD" == 1 ] && echo -n "MD;"
     [ "$DO_LVM" == 1 ] && echo -n "VG;"
     [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]  && echo -n "DM-CRYPT;"
     [ "$DO_ZFS" == 1 ] && echo -n "ZFS;"
+    echo "Mount Point;"
     echo "Size"
 else
     printf "  %-15s" "Host" 
@@ -154,12 +156,13 @@ else
 	printf "%-45s" "Device by WWN"
     fi
     [ "$DO_REV" == 1 ] && printf "%-10s" "Rev"
-    printf "%-25s" "Serial"
+    [ "$DO_SERIAL" == 1 ] && printf "%-25s" "Serial"
     [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "Warranty"
     [ "$DO_MD" == 1 ] && printf "%-10s" "MD"
     [ "$DO_LVM" == 1 ] && printf "%-25s" "VG"
     [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]  && printf "%-25s" "DM-CRYPT"
     [ "$DO_ZFS" == 1 ] && printf "%-30s" "  ZFS"
+    printf "%-30s" "Mount Point"
     printf "%8s\n\n" "Size"
 fi
 
@@ -217,20 +220,20 @@ lspci -D | \
 		    # ----------------------
 		    # Get HOST name
 		    if [ -d $path/host* ]; then
-			host=`echo $path/host* | sed 's@.*/@@'`
+			host=$(echo $path/host* | sed 's@.*/@@')
 		    else
 			host=${path/*\//}
 		    fi
 
 		    # ----------------------
 		    # Make sure this host actually have devices attached.
-		    got_hosts=`find "$path/.." -maxdepth 1 -type d -name 'host*'`
+		    got_hosts=$(find "$path/.." -maxdepth 1 -type d -name 'host*')
 		    [[ $host =~ ^ata ]] && chk_ata=${BASH_REMATCH}
 		    [ -n "$got_hosts" -a -n "$chk_ata" ] && continue
 
 		    # ----------------------
 		    # Get block path
-		    blocks=`find $path -name rev 2> /dev/null | sort`
+		    blocks=$(find $path -name rev 2> /dev/null | sort)
 
 		    # ----------------------
 		    if [ -n "$blocks" ]; then
@@ -239,28 +242,28 @@ lspci -D | \
 				# Reset path variable to actual/full path for this device
 				l=$(readlink -f "$block")
 				path=${l/\/rev*/}
-				t_id=`basename "$path"`
+				t_id=$(basename "$path")
 
 				if [[ $path =~ /port-*:? ]]; then
 				    # path: '/sys/devices/pci0000:00/0000:00:0b.0/0000:03:00.0/host0/port-0:0/end_device-0:0/target0:0:0/0:0:0:0'
-				    host=`echo "$path" | sed "s@.*/.*\(host[0-9]\+\)/port-\([0-9]\+\):\([0-9]\+\)/.*@\1:\3@"`
+				    host=$(echo "$path" | sed "s@.*/.*\(host[0-9]\+\)/port-\([0-9]\+\):\([0-9]\+\)/.*@\1:\3@")
 				fi
 
 				# ----------------------
 				# Get name
 				name=
 				if [[ $t_id =~ ^[0-9] ]] && type lsscsi > /dev/null 2>&1; then
-				    lsscsi_out=`lsscsi --device "$t_id"`
+				    lsscsi_out=$(lsscsi --device "$t_id")
 				    if ! echo "$lsscsi_out" | grep -Eqi 'disk|dvd|cd|tape'; then
 					continue
 				    fi
 
-				    name=`echo "$lsscsi_out" | sed -e 's@.*/@@' -e 's@ \[.*@@' -e 's@\[.*@@'`
+				    name=$(echo "$lsscsi_out" | sed -e 's@.*/@@' -e 's@ \[.*@@' -e 's@\[.*@@')
 				fi
 				if [ -z "$name" -o "$name" == "-" ]; then
 				    # /sys/block/*/device | grep '/0000:05:00.0/host8/'
-				    name=`ls -ln /sys/block/*/device | \
-					grep "/$t_id" | sed -e "s@.*block/\(.*\)/device .*@\1@"`
+				    name=$(ls -ln /sys/block/*/device | \
+					grep "/$t_id" | sed -e "s@.*block/\(.*\)/device .*@\1@")
 				    if [ -z "$name" ]; then
 					name="n/a"
 				    fi
@@ -287,8 +290,10 @@ lspci -D | \
 
 				# ----------------------
 				# Get serial number
-				serial=$(get_udev_info ID_SCSI_SERIAL)
-				[ "$serial" == "n/a" ] && serial=$(get_udev_info ID_SERIAL_SHORT)
+				if [ "$DO_SERIAL" == 1 ]; then
+				    serial=$(get_udev_info ID_SCSI_SERIAL)
+				    [ "$serial" == "n/a" ] && serial=$(get_udev_info ID_SERIAL_SHORT)
+				fi
 
 				# ----------------------
 				# Get device name (Disk by ID)
@@ -304,8 +309,8 @@ lspci -D | \
 				then
 				    # No match. Let's try smartctl instead then. Unfortunatly, the type
 				    # of info isn't availible 'as is', so we have to wing it a little.
-				    set -- `smartctl -a $dev_path | grep -E '^Device Model:|^Serial Number:' | \
-					sed -e "s@.* \(.*\).*@\1@" -e "s@-.*@@"`
+				    set -- $(smartctl -a $dev_path | grep -E '^Device Model:|^Serial Number:' | \
+					sed -e "s@.* \(.*\).*@\1@" -e "s@-.*@@")
 				    if [ -n "$1" -a -n "$2" ]; then
 					device_id=$(/bin/ls -l /dev/disk/by-id/scsi*$1*$2 | sed "s@.*scsi-\(.*\) -.*@\1@")
 				    fi
@@ -328,18 +333,24 @@ lspci -D | \
 				# Get MD device
 				md='n/a'
 				if [ "$DO_MD" == 1 ]; then
-				    MD=`grep $name /proc/mdstat | sed 's@: active raid1 @@'`
+				    MD=$(grep $name /proc/mdstat | sed 's@: active raid1 @@')
 				    if [ -n "$MD" ]; then
 					# md3 sdg1[0] sdb1[1]
-					set -- `echo "$MD"`
+					set -- $(echo "$MD")
 					for dev in $*; do
 					    dev=${dev//\[?\]/}
-					    if [[ $dev =~ ^$name(.*) ]]; then
-						md=$1${BASH_REMATCH[1]}
-					    elif [[ $dev =~ ^$name ]]; then
-						md="$1"
-						break
-					    fi
+
+					    md=$1
+#					    if [[ $dev =~ ^$name(.*) ]]; then
+#						# md11 : active raid1 sde3[0]
+#						# md10 : active raid1 sde1[0]
+#						# => md111
+#						#md=$1${BASH_REMATCH[1]}
+#						echo "md(1)='$md' ($BASH_REMATCH)"
+#					    elif [[ $dev =~ ^$name ]]; then
+#						md="$1"
+#						break
+#					    fi
 					done
 				    fi
 				fi
@@ -358,7 +369,7 @@ lspci -D | \
 					    dm= ; dev=
 					    if [[ $pvs =~ /dm- && "$DO_DMCRYPT" == 1 ]]; then
 						dm=${pvs//,*/}
-						dev=/`cryptsetup status $dm | grep device: | sed -e 's@.*/@@' -e 's@[0-9]$@@'`
+						dev=/$(cryptsetup status $dm | grep device: | sed -e 's@.*/@@' -e 's@[0-9]$@@')
 					    fi
 					    if [[ $pvs =~ $lvm_regexp || $dev =~ $lvm_regexp ]]; then
 						echo "$pvs" | sed "s@.*,\(.*\),lvm.*@\1@"
@@ -366,7 +377,7 @@ lspci -D | \
 					done)
 				    if [ -z "$vg" -a "$md" != "n/a" ]; then
 					# Double check - is it mounted
-					vg=`mount | grep "/$md" | sed "s@.* on \(.*\) type.*@\1@"`
+					vg=$(mount | grep "/$md" | sed "s@.* on \(.*\) type.*@\1@")
 				    fi
 				    [ -z "$vg" ] && vg='n/a'
 				fi
@@ -415,6 +426,7 @@ lspci -D | \
 					zfs_regexp="$zfs_regexp|$model-.*_$serial"
 				    fi
 				    # Make sure we only match the whole word (not 'test2' if searching for/with 'test').
+				    orig_zfs_regexp=$zfs_regexp
 				    [[ $zfs_regexp =~ \| ]] && zfs_regexp="($zfs_regexp)"
 				    zfs_regexp=\\b$zfs_regexp\\b
 
@@ -442,17 +454,25 @@ lspci -D | \
 					    elif [[ $zpool =~ $vdev_regexp ]]; then
 						zpool=${zpool#"${zpool%%[![:space:]]*}"} # Strip leading spaces
 						zfs_vdev=${zpool/ */}
-						# Somewhat ugly - this matches VDEVs that is a DEV
+
 						if [[ ! $zfs_vdev =~ raid|mirror|cache|spare
 							&& $zpool =~ $zfs_regexp
 							&& -n "$zfs_name"
 							&& -n "$zfs_vdev" ]]
 						then
-						    printf "$crypted %-17s$stat" "$zfs_name / $zfs_vdev"
+						    if [[ "$device_id" == "${zfs_vdev##$type\-}" ]]; then
+							# Oups, no! This is a VDEV with the dev only
+							#        NAME                                  STATE     ...
+							#        test1                                 ONLINE    ...
+							#          scsi-SATA_ST3000DM001-1CH_Z1F46X7A  ONLINE    ...
+							printf "$crypted %-17s$stat" "$zfs_name"
+						    else
+							printf "$crypted %-17s$stat" "$zfs_name / $zfs_vdev"
+						    fi
 						    break
 						fi
 					    elif [[ $zpool =~ replacing ]]; then
-						replacing="rpl"`echo "$zpool" | sed "s@.*-\([0-9]\+\) .*@\1@"`
+						replacing="rpl"$(echo "$zpool" | sed "s@.*-\([0-9]\+\) .*@\1@")
 						ii=1
 						continue
 
@@ -510,19 +530,35 @@ lspci -D | \
 				fi
 
 				# ----------------------
+				# Get mountpoint
+				regexp=$orig_zfs_regexp
+				[ -n "$md" -a "$md" != "n/a" ] && regexp="$regexp|$md"
+				if [ -n "$zfs" -a "$zfs" != "n/a" ]; then
+				    tmp=${zfs#"${zfs%%[![:space:]]*}"} # Strip leading spaces
+				    regexp="$regexp| /${tmp%% *}"
+				fi
+
+				set -- $(mount | egrep "($regexp)")
+				if [ -n "$3" ]; then
+				    mntpt="$3 ($5)"
+				else
+				    mntpt="n/a"
+				fi
+
+				# ----------------------
 				# Get size of disk
 				if type fdisk > /dev/null 2>&1; then
 				    if [ -n "$dev_path" ]; then
-					size=`fdisk -l $dev_path 2> /dev/null | \
+					size=$(fdisk -l $dev_path 2> /dev/null | \
 					    grep '^Disk /' | \
 					    sed -e "s@.*: \(.*\), .*@\1@" \
-					    -e 's@\.[0-9] @@' -e 's@ @@g'`
+					    -e 's@\.[0-9] @@' -e 's@ @@g')
 					if [[ $size =~ ^[0-9][0-9][0-9][0-9]GB ]] && type bc > /dev/null 2>&1; then
 					    s=${size/GB/}
-					    size=`echo "scale=2; $s / 1024" | bc`"TB"
+					    size=$(echo "scale=2; $s / 1024" | bc)"TB"
 					elif [[ $size =~ ^[0-9][0-9][0-9][0-9]MB ]] && type bc > /dev/null 2>&1; then
 					    s=${size/MB/}
-					    size=`echo "scale=2; $s / 1024" | bc`"GB"
+					    size=$(echo "scale=2; $s / 1024" | bc)"GB"
 					fi
 				    fi
 				fi
@@ -539,7 +575,7 @@ lspci -D | \
 					tmpmodel="$model"
 				    fi
 
-				    set -- `grep -E -w "^$tmpmodel.*$serial" ~/.disks_serial+warranty`
+				    set -- $(grep -E -w "^$tmpmodel.*$serial" ~/.disks_serial+warranty)
 				    if [ -n "$4" ]; then
 					warranty="$4"
 				    else
@@ -558,7 +594,7 @@ lspci -D | \
 					tmpmodel="$model"
 				    fi
 
-				    set -- `grep -E -w "^$tmpmodel.*$serial" ~/.disks_physical_location`
+				    set -- $(grep -E -w "^$tmpmodel.*$serial" ~/.disks_physical_location)
 				    if [ -n "$3" -a -n "$4" ]; then
 					location="$3:$4"
 				    else
@@ -575,24 +611,26 @@ lspci -D | \
 				    [ "$DO_LOCATION" == 1 ] && echo -n "$location;"
 				    echo -n "$name;$model;$device_id;"
 				    [ "$DO_REV" == 1 ] && echo -n "$rev;"
-				    echo -n "$serial;"
+				    [ "$DO_SERIAL" == 1 ] && echo -n "$serial;"
 				    [ "$DO_WARRANTY" == 1 ] && echo -n "$warranty;"
 				    [ "$DO_MD" == 1 ] && echo -n "$md;"
 				    [ "$DO_LVM" == 1 ] && echo -n "$vg;"
 				    [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ] && echo -n "$dmcrypt;"
 				    [ "$DO_ZFS" == 1 ] && echo -n "$zfs;"
+				    echo "$mntpt;"
 				    echo "$size"
 				else
 				    printf "  %-15s" "$host"
 				    [ "$DO_LOCATION" == 1 ] && printf "%-4s" "$location"
 				    printf " %-4s %-20s%-45s" "$name" "$model" "$device_id"
 				    [ "$DO_REV" == 1 ] && printf "%-10s" "$rev"
-				    printf "%-25s" "$serial"
+				    [ "$DO_SERIAL" == 1 ] && printf "%-25s" "$serial"
 				    [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "$warranty"
 				    [ "$DO_MD" == 1 ] && printf "%-10s" "$md"
 				    [ "$DO_LVM" == 1 ] && printf "%-25s" "$vg"
 				    [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ] && printf "%-25s" "$dmcrypt"
 				    [ "$DO_ZFS" == 1 ] && printf "%-30s" "$zfs"
+				    printf "%-30s" "$mntpt"
 				    printf "%8s\n" "$size"
 				fi
 			    done # => 'while read block; do'
