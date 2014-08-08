@@ -451,7 +451,7 @@ lspci -D | \
 						done
 
 					    # VDEV type
-					    elif [[ $zpool =~ $vdev_regexp ]]; then
+					    elif [[ $zpool =~ raid|mirror|cache|spare ]]; then
 						zpool=${zpool#"${zpool%%[![:space:]]*}"} # Strip leading spaces
 						zfs_vdev=${zpool/ */}
 
