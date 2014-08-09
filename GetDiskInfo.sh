@@ -184,7 +184,8 @@ lspci -D > $PCI_DEVS
 
 (cat $PCI_DEVS | grep -E 'SATA|IDE'  ; \
  cat $PCI_DEVS | grep -E 'SCSI|RAID' ; \
- cat $PCI_DEVS | grep USB) | \
+ cat $PCI_DEVS | grep -E 'FireWire|IEEE' ; \
+ cat $PCI_DEVS | grep -E 'USB' | grep -v OHCI) | \
     while read line; do
 	ctrl_id=${line%% *}
 
@@ -210,13 +211,14 @@ lspci -D > $PCI_DEVS
 
 	# --------------
 	# First while, just to sort '.../host2' before '.../host10'.
-	find /sys/bus/pci/devices/$ctrl_id/{host*,ide*,ata*,cciss*,usb[0-9]*} -maxdepth 0 2> /dev/null | \
+	find /sys/bus/pci/devices/$ctrl_id/{host*,ide*,ata*,cciss*,usb[0-9]*,fw[0-9]*} -maxdepth 0 2> /dev/null | \
 	    while read path; do
 		host=${path/*host/}
 		host=${host/*ide/}
 		host=${host/*ata/}
 		host=${host/*cciss/}
 		host=${host/*usb/}
+		host=${host/*fw/}
 		printf "host%0.2d;$path\n" "$host"
 	    done | \
 	    sort | \
@@ -281,6 +283,10 @@ lspci -D > $PCI_DEVS
 				elif [[ $path =~ /port-*:? ]]; then
 				    # path='/sys/devices/pci0000:00/0000:00:0b.0/0000:03:00.0/host0/port-0:0/end_device-0:0/target0:0:0/0:0:0:0'
 				    host=$(echo "$path" | sed "s@.*/.*\(host[0-9]\+\)/port-\([0-9]\+\):\([0-9]\+\)/.*@\1:\3@")
+				    t_id=${path##*/} # basename "$path"
+				elif [[ $path =~ usb ]]; then
+				    host=$(echo $path | sed "s@.*/target\([0-9]\+\):.*@host\1@")
+
 				    t_id=${path##*/} # basename "$path"
 				else
 				    t_id=${path##*/} # basename "$path"
