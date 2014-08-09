@@ -285,7 +285,8 @@ lspci -D > $PCI_DEVS
 				    host=$(echo "$path" | sed "s@.*/.*\(host[0-9]\+\)/port-\([0-9]\+\):\([0-9]\+\)/.*@\1:\3@")
 				    t_id=${path##*/} # basename "$path"
 				elif [[ $path =~ usb ]]; then
-				    host=$(echo $path | sed "s@.*/target\([0-9]\+\):.*@host\1@")
+				    # path=/sys/devices/pci0000:00/0000:00:13.2/usb6/6-2/6-2:1.0/host8/target8:0:0/8:0:0:0
+				    host=$(echo $path | sed "s@.*/usb\([0-9]\+\)/[0-9]-\([0-9]\)/.*@usb\1:\2@") # => usb6:2
 
 				    t_id=${path##*/} # basename "$path"
 				else
