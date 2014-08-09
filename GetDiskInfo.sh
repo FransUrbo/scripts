@@ -179,8 +179,12 @@ get_udev_info () {
 
 # --------------
 # MAIN function - get a list of all PCI devices, extract storage devices.
-lspci -D | \
-    grep -E 'SATA|SCSI|IDE|RAID' | \
+PCI_DEVS=$(tempfile -d /tmp -p pci.)
+lspci -D > $PCI_DEVS
+
+(cat $PCI_DEVS | grep -E 'SATA|IDE'  ; \
+ cat $PCI_DEVS | grep -E 'SCSI|RAID' ; \
+ cat $PCI_DEVS | grep USB) | \
     while read line; do
 	ctrl_id=${line%% *}
 
@@ -192,6 +196,8 @@ lspci -D | \
 	    else
 		type=scsi
 	    fi
+	elif [[ $line =~ USB ]]; then
+	    type=usb
 	else
 	    type=ata
 	fi
@@ -204,12 +210,13 @@ lspci -D | \
 
 	# --------------
 	# First while, just to sort '.../host2' before '.../host10'.
-	find /sys/bus/pci/devices/$ctrl_id/{host*,ide*,ata*,cciss*} -maxdepth 0 2> /dev/null | \
+	find /sys/bus/pci/devices/$ctrl_id/{host*,ide*,ata*,cciss*,usb[0-9]*} -maxdepth 0 2> /dev/null | \
 	    while read path; do
 		host=${path/*host/}
 		host=${host/*ide/}
 		host=${host/*ata/}
 		host=${host/*cciss/}
+		host=${host/*usb/}
 		printf "host%0.2d;$path\n" "$host"
 	    done | \
 	    sort | \
@@ -232,21 +239,51 @@ lspci -D | \
 		    [ -n "$got_hosts" -a -n "$chk_ata" ] && continue
 
 		    # ----------------------
-		    # Get block path
-		    blocks=$(find $path -name rev 2> /dev/null | sort)
+		    # Get block device path(s)
+		    if find $path/phy-* -maxdepth 0 > /dev/null 2>&1; then
+			blk_devs=$(find $path/phy-* -name phy_identifier 2> /dev/null | sort)
+		    else
+			blk_devs=$(find $path -name rev 2> /dev/null | sort)
+		    fi
 
 		    # ----------------------
-		    if [ -n "$blocks" ]; then
-			echo "$blocks" |
-			    while read block; do
+		    if [ -n "$blk_devs" ]; then
+			echo "$blk_devs" |
+			    while IFS=" " read dev; do
 				# Reset path variable to actual/full path for this device
-				l=$(readlink -f "$block")
-				path=${l/\/rev*/}
-				t_id=$(basename "$path")
+				l=$(readlink -f "$dev")
+				path=${l%/*}     # dirname $l
 
-				if [[ $path =~ /port-*:? ]]; then
-				    # path: '/sys/devices/pci0000:00/0000:00:0b.0/0000:03:00.0/host0/port-0:0/end_device-0:0/target0:0:0/0:0:0:0'
+				# Catch empty ports on a SAS card
+				if [[ $path =~ /phy-*:? ]]; then
+				    # path='/sys/devices/pci0000:00/0000:00:02.0/0000:01:00.0/host0/phy-0:0/sas_phy/phy-0:0'
+
+				    if [[ -e "$path/device/port" ]]; then
+					# Port have attached device
+
+					rev=$(find $path/device/port/ -name 'rev')
+					# rev='/sys/devices/pci0000:00/0000:00:02.0/0000:01:00.0/host0/phy-0:0/sas_phy/phy-0:0/device/port/end_device-0:0/target0:0:0/0:0:0:0/rev'
+
+					host=$(echo "$rev" | sed 's@.*/phy-\([0-9]\+\):\([0-9]\+\)/.*@host\1:\2@')
+
+					t=${rev%/*} # remove file part
+					t_id=${t##*/}
+				    else
+					# Empty port
+					host=$(echo $path | sed 's@.*/phy-\([0-9]\+\):\([0-9]\+\)/.*@host\1:\2@')
+
+					if [ "$DO_MACHINE_READABLE" == 0 ]; then
+					    printf "  %-15s\n" $host
+					fi
+
+					continue
+				    fi
+				elif [[ $path =~ /port-*:? ]]; then
+				    # path='/sys/devices/pci0000:00/0000:00:0b.0/0000:03:00.0/host0/port-0:0/end_device-0:0/target0:0:0/0:0:0:0'
 				    host=$(echo "$path" | sed "s@.*/.*\(host[0-9]\+\)/port-\([0-9]\+\):\([0-9]\+\)/.*@\1:\3@")
+				    t_id=${path##*/} # basename "$path"
+				else
+				    t_id=${path##*/} # basename "$path"
 				fi
 
 				# ----------------------
@@ -312,8 +349,12 @@ lspci -D | \
 				    set -- $(smartctl -a $dev_path | grep -E '^Device Model:|^Serial Number:' | \
 					sed -e "s@.* \(.*\).*@\1@" -e "s@-.*@@")
 				    if [ -n "$1" -a -n "$2" ]; then
-					device_id=$(/bin/ls -l /dev/disk/by-id/scsi*$1*$2 | sed "s@.*scsi-\(.*\) -.*@\1@")
+					device_id=$(/bin/ls -l /dev/disk/by-id/$type*$1*$2 | sed "s@.*$type-\(.*\) -.*@\1@")
 				    fi
+				fi
+				if [[ "$device_id" == 'n/a' ]]; then
+				    # One last attempt!
+				    device_id=$(/bin/ls -l /dev/disk/by-id/ | grep -E "/$name$" | sed "s@.*usb-\(.*\) -.*@\1@")
 				fi
 
 				# ----------------------
@@ -535,7 +576,10 @@ lspci -D | \
 				[ -n "$md" -a "$md" != "n/a" ] && regexp="$regexp|$md"
 				if [ -n "$zfs" -a "$zfs" != "n/a" ]; then
 				    tmp=${zfs#"${zfs%%[![:space:]]*}"} # Strip leading spaces
-				    regexp="$regexp| /${tmp%% *}"
+
+				    # share2 on /share type zfs (rw,nosuid,noexec,noatime,noxattr,noacl)
+				    # share2 on /share@ type zfs (rw,nosuid,noexec,noatime,noxattr,noacl)
+				    regexp="$regexp|^${tmp%% *} .* zfs | /${tmp%% *} .* zfs "
 				fi
 
 				set -- $(mount | egrep "($regexp)")
@@ -655,4 +699,4 @@ fi
 
 [ -f "$ZFS_TEMP" ] && rm -f "$ZFS_TEMP"
 [ -f "$LVM_TEMP" ] && rm -f "$LVM_TEMP"
-rm -f $TEMP_FILE
+rm -f $TEMP_FILE $PCI_DEVS
