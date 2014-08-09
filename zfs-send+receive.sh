@@ -7,7 +7,7 @@
 
 SSH_OPTS="-24Cx -o ConnectionAttempts=10 -o ConnectTimeout=60"
 GET_SNAP="zfs list -H -tsnapshot -oname -d1"
-#PORT=$$ # Uncomment to run simple 'send | receive'
+PORT=$$ # Uncomment to run simple 'send | receive'
 
 # ------------------------------------------
 
@@ -29,14 +29,14 @@ function get_local_snap {
 
 # Cleanup remote host
 function cleanup {
-    if [ -n "$DSET" ]; then
+    if [[ -n "$DSET" ]]; then
 	ssh $SSH_HOST ps -Aw \| grep -E \"nc \.\* $PORT$\|zfs receive \.\* $DSET\" \| grep -v \'grep \'
 
 	pids=`ssh $SSH_HOST ps -Aw \| grep -E \"nc \.\* $PORT$\|zfs receive \.\* $DSET\" \| grep -v \'grep \' | sed 's@ .*@@'`
-	[ -n "$pids" ] && ssh $SSH_HOST kill $pids
+	[[ -n "$pids" ]] && ssh $SSH_HOST kill $pids
     fi
 }
-[ -n "$PORT" ] && trap cleanup EXIT
+[[ -n "$PORT" ]] && trap cleanup EXIT
 
 function main {
     dset="$dset"
@@ -56,34 +56,45 @@ function main {
 	# OR
 	# The latest remote does not match the name of the latest local snapshot
 
-	if [ -z "$PORT" ]; then
+	if [[ -z "$PORT" ]]; then
 	    # Simple, no-nonsence send | receive
 	    zfs send -p "$local_snap" | \
 		ssh $SSH_OPTS $SSH_HOST zfs receive -uvF \"$dset\"
-	    if [ "$?" != "0" ]; then
+	    if [[ "$?" != "0" ]]; then
 		((snap_nr += 1))
 		main "$dset" $snap_nr
 	    fi
 	else
+	    ret=0 ; rm -f /tmp/rcv.$$*
+
 	    # Just to make sure that cleanup() don't kill something that shouldn't be killed!
 	    DSET="$dset"
 
 	    # Startup a receiver on the remote host
-	    ssh -n $SSH_HOST nc -4dvln $SSH_HOST $PORT \| zfs receive -uvF \"$dset\" &
+	    (ssh -n $SSH_HOST nc -4dvln $SSH_HOST $PORT \| zfs receive -uvF \"$dset\" 2>&1 | tee /tmp/rcv.$$-1) &
 
 	    # Just make sure the receiver is up and running!
 	    sleep 2
 	    pid=$(/bin/ps faxwww | egrep "ssh .* nc .* zfs receive .*$DSET" | grep -v 'grep ' | sed 's@ [a-z].*@@')
 
 	    # Send the snapshot to netcat, which sends it to netcat on the receiver.
-	    zfs send -p "$local_snap" | nc -nw5 $SSH_HOST $PORT
+	    (zfs send -p "$local_snap" | nc -nw5 $SSH_HOST $PORT 2>&1 | tee /tmp/rcv.$$-2)
 
 	    # Cleanup local and remote (kill all process regarding this snapshot).
 	    # - netcat doesn't shutdown after the send/receive is completed...
-	    [ -n "$pid" ] && kill $pid
+	    [[ -n "$pid" ]] && kill $pid
 
-	    pids=`ssh $SSH_HOST ps -Aw \| grep -E \"nc \.\* $PORT$\|zfs receive \.\* $dset\" \| grep -v \'grep \' | sed 's@ .*@@'`
-	    [ -n "$pids" ] && ssh $SSH_HOST kill $pids
+	    # NOTE: Don't kill remote if send gave error - reuse this for the next snapshot in list...
+	    grep -Eq 'invalid backup stream|Invalid exchange' /tmp/rcv.$$* && ret=1
+	    echo "ret='$ret'"
+
+	    if [[ "$ret" -eq "1" ]]; then
+		((snap_nr += 1))
+		main "$dset" $snap_nr
+	    else
+		pids=`ssh $SSH_HOST ps -Aw \| grep -E \"nc \.\* $PORT$\|zfs receive \.\* $dset\" \| grep -v \'grep \' | sed 's@ .*@@'`
+		[ -n "$pids" ] && ssh $SSH_HOST kill $pids
+	    fi
 	fi
     fi
 }
@@ -109,5 +120,6 @@ fi
 #zfs list -H -tfilesystem,volume -oname |
 cat /tmp/zfs_list.txt |
     while read dset; do
-	main "$dset" 0
+	nr=0
+	main "$dset" $nr
     done
