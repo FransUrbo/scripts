@@ -7,7 +7,7 @@
 
 SSH_OPTS="-24Cx -o ConnectionAttempts=10 -o ConnectTimeout=60"
 GET_SNAP="zfs list -H -tsnapshot -oname -d1"
-#PORT=9000 # Uncomment to run simple 'send | receive'
+PORT=9000 # Uncomment to run simple 'send | receive'
 
 #PS_OPT="-Aw"				# *BSD
 PS_OPT="faxwww"				# Linux
@@ -41,7 +41,7 @@ function cleanup {
     local pids
 
     if [[ -n "$DSET" ]]; then
-	pids=`ssh $SSH_HOST ps $PS_OPT \| grep -E \"nc \.\* $PORT$\|zfs receive \.\* $DSET\" \| grep -v \'grep \' | sed 's@ .*@@'`
+	pids=$(ssh $SSH_HOST ps $PS_OPT \| grep -E \"nc \.\* $PORT$\|zfs receive \.\* $DSET\\\"$\" \| grep -v \'grep \' \| sed 's@ \?.*@@')
 	[[ -n "$pids" ]] && ssh $SSH_HOST kill $pids
     fi
 }
@@ -92,7 +92,7 @@ function main {
 
 	    # Cleanup local and remote (kill all process regarding this snapshot).
 	    # - netcat doesn't shutdown after the send/receive is completed...
-	    [[ -n "$pid" ]] && kill $pid
+#	    [[ -n "$pid" ]] && kill $pid
 
 	    # NOTE: Don't kill remote if send gave error - reuse this for the next snapshot in list...
 	    grep -Eq 'invalid backup stream|Invalid exchange|invalid name' /tmp/rcv.$$* && ret=1
@@ -100,9 +100,8 @@ function main {
 	    if [[ "$ret" -eq "1" ]]; then
 		((snap_nr += 1))
 		main "$dset" $snap_nr
-	    else
-		local pids=`ssh $SSH_HOST ps $PS_OPT \| grep -E \"nc \.\* $PORT$\|zfs receive \.\* $dset\"$" \| grep -v \'grep \' | sed 's@ .*@@'`
-		[ -n "$pids" ] && ssh $SSH_HOST kill $pids
+#	    else
+#		cleanup
 	    fi
 	fi
     fi
