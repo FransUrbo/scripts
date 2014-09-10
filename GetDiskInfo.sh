@@ -17,23 +17,16 @@
 #
 # Extra information is stored in the following files (script will
 # ignore any line that starts with a dash - #):
-#   $HOME/.disks_physical_location
+#   $HOME/.disks
 #       Columns: Model, Serial, Enclosure, Slot - separated by tabs
 #       Example:
 #
-#       # Model		Serial			Enclosure	Slot
-#       ST31500341AS	9VS4XK4T		4		1
-#       ST31500341AS	9VS3SAWS		4		3
-#
-#   $HOME/.disks_serial+warranty
-#       Columns: Model, Serial, Rev, Warranty, Device - separated by tabs.
-#       # Model		Serial			Rev	Warranty	Device
-#       ST31500341AS	9VS4XK4T		CC1H	20140112	sdf
-#       ST31500341AS	9VS3SAWS		CC1H	+		sdh
+#       # Model		Serial			Enclosure	Slot	Rev	Warranty	Device
+#       ST31500341AS	9VS4XK4T		4		1	CC1H	20140112	sdf
+#       ST31500341AS	9VS3SAWS		4		3	CC1H	+		sdh
 #
 #   For me, a '+' means that the warranty have expired. This can be any
-#   character, just remember what means what. Only Model and Warranty
-#   column is of importance. Must be first and fourth though!
+#   character, just remember what means what.
 
 [ "$USER" != "root" ] && \
     echo "WARNING: This script really needs to run with root privilegues." \
@@ -88,12 +81,9 @@ if type cryptsetup > /dev/null 2>&1; then
 fi
 
 DO_LOCATION=0
-if [ -f $HOME/.disks_physical_location ]; then
-    DO_LOCATION=1
-fi
-
 DO_WARRANTY=0
-if [ -f $HOME/.disks_serial+warranty ]; then
+if [ -f $HOME/.disks ]; then
+    DO_LOCATION=1
     DO_WARRANTY=1
 fi
 
@@ -626,7 +616,7 @@ lspci -D > $PCI_DEVS
 					tmpmodel="$model"
 				    fi
 
-				    set -- $(grep -E -w "^$tmpmodel.*$serial" ~/.disks_serial+warranty)
+				    set -- $(grep -E -w "^$tmpmodel.*$serial" ~/.disks)
 				    if [ -n "$4" ]; then
 					warranty="$4"
 				    else
@@ -645,7 +635,7 @@ lspci -D > $PCI_DEVS
 					tmpmodel="$model"
 				    fi
 
-				    set -- $(grep -E -w "^$tmpmodel.*$serial" ~/.disks_physical_location)
+				    set -- $(grep -E -w "^$tmpmodel.*$serial" ~/.disks)
 				    if [ -n "$3" -a -n "$4" ]; then
 					location="$3:$4"
 				    else
