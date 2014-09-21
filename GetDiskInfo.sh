@@ -428,6 +428,7 @@ lspci -D > $PCI_DEVS
 				    # OID: SATA_Corsair_Force_311486508000008952122
 				    # ZFS: ata-Corsair_Force_3_SSD_11486508000008952122
 				    tmpnam=${device_id/SATA_/}
+				    [ -z "$tmpnam" ] && tmpnam="n/a"
 
 				    # Setup a matching string.
 				    # grep -E matches _every line_ if 'NULL|sda|NULL'!
