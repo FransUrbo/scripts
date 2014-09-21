@@ -622,8 +622,8 @@ lspci -D > $PCI_DEVS
 				    fi
 
 				    set -- $(grep -E -w "^$tmpmodel.*$serial" ~/.disks)
-				    if [ -n "$4" ]; then
-					warranty="$4"
+				    if [ -n "$6" ]; then
+					warranty="$6"
 				    else
 					warranty="n/a"
 				    fi
