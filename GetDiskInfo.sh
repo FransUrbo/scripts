@@ -351,7 +351,10 @@ lspci -D > $PCI_DEVS
 				fi
 				if [[ "$device_id" == 'n/a' ]]; then
 				    # One last attempt!
-				    device_id=$(/bin/ls -l /dev/disk/by-id/ | grep -E "/$name$" | sed "s@.*usb-\(.*\) -.*@\1@")
+				    device_id=$(/bin/ls -l /dev/disk/by-id/ | \
+					grep -E "/$name$" | \
+					sed -e "s@.*usb-\(.*\) -.*@\1@" \
+					    -e "s@.*ata-\(.*\) -.*@\1@")
 				fi
 
 				# ----------------------
@@ -464,6 +467,7 @@ lspci -D > $PCI_DEVS
 				    if [ "$model" != 'n/a' -a "$serial" != 'n/a' ]; then
 					zfs_regexp="$zfs_regexp|$model-.*_$serial"
 				    fi
+
 				    # Make sure we only match the whole word (not 'test2' if searching for/with 'test').
 				    orig_zfs_regexp=$zfs_regexp
 				    [[ $zfs_regexp =~ \| ]] && zfs_regexp="($zfs_regexp)"
@@ -580,7 +584,7 @@ lspci -D > $PCI_DEVS
 				    regexp="$regexp|^${tmp%% *} .* zfs | /${tmp%% *} .* zfs "
 				fi
 
-				set -- $(mount | egrep "($regexp)")
+				set -- $(mount | grep -E "($regexp)")
 				if [ -n "$3" ]; then
 				    mntpt="$3 ($5)"
 				else
