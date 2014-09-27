@@ -1,5 +1,6 @@
 #!/usr/bin/perl -w
 
+$DEBUG = 0;
 $ZFS_SRC_DIR = "/usr/src/zfs";
 
 chdir("$ZFS_SRC_DIR")
@@ -46,7 +47,6 @@ for(my $commit_nr = $#COMMIT; $commit_nr > 0; $commit_nr--) {
 
 	$fnd = `find $ZFS_SRC_DIR -name $file | wc -l`;
 	chomp($fnd);
-	print "fnd=$fnd\n";
 	next if($fnd == 0);
 
 	$zfs_related = 1;
@@ -56,22 +56,42 @@ for(my $commit_nr = $#COMMIT; $commit_nr > 0; $commit_nr--) {
 
     next if(! $zfs_related);
 
-    my $subj = $COMMIT[$commit_nr][4];
-    $subj =~ s/\"/\\\"/;
-    open(MAIL, "| mailx -s \"New illumos-gate commit - $subj\" turbo\@bayour.com")
-	|| die("Can't pipe to 'mailx', $!\n");
+    for(my $i=4; $COMMIT[$commit_nr][$i]; $i++) {
+	if($COMMIT[$commit_nr][$i] =~ /^    [0-9][0-9][0-9][0-9] /) {
+	    my $subj = $COMMIT[$commit_nr][$i];
+	    $subj =~ s/\"/\\\"/;
+	    while($subj =~ s/^\ //) { ; }
+
+	    push(@SUBJS, $subj);
+	}
+    }
+
+    if(! $DEBUG) {
+	open(MAIL, "| mailx -s \"New illumos-gate commit - $SUBJS[0]\" turbo\@bayour.com")
+	    || die("Can't pipe to 'mailx', $!\n");
+	$fb = MAIL;
+    } else {
+	$fb = STDOUT;
+    }
 
     my @commit = @{$COMMIT[$commit_nr]};
     for(my $line_nr = 0; $line_nr <= $#commit; $line_nr++) {
-	print MAIL "$COMMIT[$commit_nr][$line_nr]\n";
+	print $fb "    $COMMIT[$commit_nr][$line_nr]\n";
     }
-    print MAIL "\n";
+    print $fb "\n";
 
+    print $fb "    References:\n";
     $commit = (split(' ', $COMMIT[$commit_nr][0]))[1];
-    print MAIL "https://github.com/illumos/illumos-gate/commit/$commit\n";
-    print MAIL "\n";
+    print $fb "      https://github.com/illumos/illumos-gate/commit/$commit\n";
+    for(my $i=0; $SUBJS[$i]; $i++) {
+	my $issue = $SUBJS[$i];
+	$issue =~ s/\ .*//;
+	print $fb "      https://www.illumos.org/issues/$issue\n";
+    }
 
-    close(MAIL);
+    print $fb "\n";
+
+    close(MAIL) if(!$DEBUG);
 }
 
 if($COMMIT[1][0]) {
