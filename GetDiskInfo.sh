@@ -254,6 +254,16 @@ lspci -D > $PCI_DEVS
 					# Port have attached device
 
 					rev=$(find $path/device/port/ -name 'rev')
+					if [ -z "$rev" ]; then
+					    # SOMETHING is connected here, but we can't figure out what..
+					    # This happened to me when the SAS chain kicked a disk.
+					    # => Simulate 'empty port'.
+					    host=$(echo $path | sed 's@.*/phy-\([0-9]\+\):\([0-9]\+\)/.*@host\1:\2@')
+					    [ "$DO_MACHINE_READABLE" == 0 ] && printf "  %-15s\n" $host
+
+					    continue
+					fi
+
 					# rev='/sys/devices/pci0000:00/0000:00:02.0/0000:01:00.0/host0/phy-0:0/sas_phy/phy-0:0/device/port/end_device-0:0/target0:0:0/0:0:0:0/rev'
 
 					host=$(echo "$rev" | sed 's@.*/phy-\([0-9]\+\):\([0-9]\+\)/.*@host\1:\2@')
@@ -263,10 +273,7 @@ lspci -D > $PCI_DEVS
 				    else
 					# Empty port
 					host=$(echo $path | sed 's@.*/phy-\([0-9]\+\):\([0-9]\+\)/.*@host\1:\2@')
-
-					if [ "$DO_MACHINE_READABLE" == 0 ]; then
-					    printf "  %-15s\n" $host
-					fi
+					[ "$DO_MACHINE_READABLE" == 0 ] && printf "  %-15s\n" $host
 
 					continue
 				    fi
@@ -294,7 +301,7 @@ lspci -D > $PCI_DEVS
 
 				    name=$(echo "$lsscsi_out" | sed -e 's@.*/@@' -e 's@ \[.*@@' -e 's@\[.*@@')
 				fi
-				if [ -z "$name" -o "$name" == "-" ]; then
+				if [ -z "$name" -o "$name" == "-" ] && [ -n "$t_id" ]; then
 				    # /sys/block/*/device | grep '/0000:05:00.0/host8/'
 				    name=$(ls -ln /sys/block/*/device | \
 					grep "/$t_id" | sed -e "s@.*block/\(.*\)/device .*@\1@")
