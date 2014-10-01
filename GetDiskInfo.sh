@@ -149,10 +149,10 @@ else
     [ "$DO_SERIAL" == 1 ] && printf "%-25s" "Serial"
     [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "Warranty"
     [ "$DO_MD" == 1 ] && printf "%-10s" "MD"
-    [ "$DO_LVM" == 1 ] && printf "%-25s" "VG"
+    [ "$DO_LVM" == 1 ] && printf "%-10s" "VG"
     [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]  && printf "%-25s" "DM-CRYPT"
     [ "$DO_ZFS" == 1 ] && printf "%-30s" "  ZFS"
-    printf "%-30s" "Mount Point"
+    printf "%-20s" "Mount Point"
     printf "%8s\n\n" "Size"
 fi
 
@@ -582,7 +582,16 @@ lspci -D > $PCI_DEVS
 				# ----------------------
 				# Get mountpoint
 				regexp=$orig_zfs_regexp
-				[ -n "$md" -a "$md" != "n/a" ] && regexp="$regexp|$md"
+				if [ -n "$md" -a "$md" != "n/a" ]; then
+				    if [ -n "$regexp" ]; then
+					regexp="$regexp|$md"
+				    else
+					regexp="$md"
+				    fi
+				fi
+				if [ -n "$vg" -a "$vg" != "n/a" ]; then
+				    regexp="$regexp|/mapper/$vg"
+				fi
 				if [ -n "$zfs" -a "$zfs" != "n/a" ]; then
 				    tmp=${zfs#"${zfs%%[![:space:]]*}"} # Strip leading spaces
 
@@ -591,9 +600,13 @@ lspci -D > $PCI_DEVS
 				    regexp="$regexp|^${tmp%% *} .* zfs | /${tmp%% *} .* zfs "
 				fi
 
-				set -- $(mount | grep -E "($regexp)")
-				if [ -n "$3" ]; then
-				    mntpt="$3 ($5)"
+				if [ -n "$regexp" ]; then
+				    set -- $(mount | grep -E "($regexp)")
+				    if [ -n "$3" ]; then
+					mntpt="$3 ($5)"
+				    else
+					mntpt="n/a"
+				    fi
 				else
 				    mntpt="n/a"
 				fi
@@ -680,10 +693,10 @@ lspci -D > $PCI_DEVS
 				    [ "$DO_SERIAL" == 1 ] && printf "%-25s" "$serial"
 				    [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "$warranty"
 				    [ "$DO_MD" == 1 ] && printf "%-10s" "$md"
-				    [ "$DO_LVM" == 1 ] && printf "%-25s" "$vg"
+				    [ "$DO_LVM" == 1 ] && printf "%-10s" "$vg"
 				    [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ] && printf "%-25s" "$dmcrypt"
 				    [ "$DO_ZFS" == 1 ] && printf "%-30s" "$zfs"
-				    printf "%-30s" "$mntpt"
+				    printf "%-20s" "$mntpt"
 				    printf "%8s\n" "$size"
 				fi
 			    done # => 'while read block; do'
