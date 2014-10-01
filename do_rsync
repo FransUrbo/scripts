@@ -1,0 +1,138 @@
+#!/bin/bash
+
+# Written by Turbo Fredriksson <turbo.fredriksson@elits.se>
+# Version 1.1 (20110325)
+
+#set -e
+
+DRYRUN=""
+SHOW=""
+VERBOSE=""
+DELETE=""
+DEEP=""
+SSH=""
+LOOP=""
+LINKS=""
+ONE_FS=""
+
+SCRIPT_DIR=`dirname $0`
+START_DIR=`pwd`
+
+function help {
+   echo "Usage: `basename $0` [option] <[[username@]SourceIP:]SourceDir>... <[[username@]SourceIP:]DestinationDir>"
+   echo "Options: -n, --dry-run         perform a trial run with no changes made"
+   echo "         -s, --show            only show full command line to execute"
+   echo "         -d, --delete          receiver deletes during xfer, not before"
+   echo "         -D, --deep            skip based on checksum, not mod-time & size"
+   echo "         -l, --loop            run within a loop - do unlimited retries"
+   echo "         -v, --verbose         show progress during transfer"
+   echo "         -L, --copy-links      transform symlink into referent file/dir"
+   echo "         -x, --one-file-system Do not traverse sub filesystems"
+   exit 1
+}
+
+# -------------------------
+# Check/Get parameters
+TEMP=`getopt -o n,s,d,D,l,v,h,L,x --long dry-run,show,delete,deep,loop,verbose,help,copy-links,one-file-system -- "$@"`
+eval set -- "$TEMP"
+while true; do
+    case "$1" in
+      	-n|--dry-run)
+	    DRYRUN="--dry-run"
+	    shift
+	    ;;
+	-s|--show)
+	    SHOW=1
+	    shift
+	    ;;
+	-d|--delete)
+	    DELETE="--delete-during"
+	    shift
+	    ;;
+	-D|--deep) 
+	    DEEP="--checksum"
+	    shift
+	    ;;
+	-l|--loop)
+	    LOOP=1
+	    shift
+	    ;;
+	-v|--verbose)
+	    VERBOSE="--verbose"
+	    shift
+	    ;;
+	-h|--help)
+	    help
+	    ;;
+	-L|--copy-links)
+	    LINKS="--copy-links"
+	    shift
+	    ;;
+	-x|--one-file-system)
+	    ONE_FS="--one-file-system"
+	    shift
+	    ;;
+	--)
+	    shift
+
+	    [ -z "$1" -o -z "$2" ] && help
+
+	    SOURCES=""
+	    while [ -n "$1" ]; do
+		    if [ -z "$2" ]; then
+			    DEST="$1"
+			    break
+		    else
+			    s=`echo "$1" | sed 's@/$@@'`
+			    SOURCES="$SOURCES \"$s\""
+			    shift
+		    fi
+	    done
+
+	    break
+	    ;;
+	*) echo "Internal error!"; exit 1;;
+    esac
+done
+
+[ -z "$SOURCES" -a -z "$DEST" ] && help
+if echo "$SOURCES" | grep -q ':'; then
+    SSH="--rsh=ssh --no-motd"
+else
+    if echo "$DEST" | grep -q ':'; then
+	SSH="--rsh=ssh --no-motd"
+    else
+	# Not a remote dir - create it if it doesn't exist
+	DEST="`echo \"$DEST\" | sed 's@/$@@'`"
+	[ ! -d "$DEST" ] && mkdir -p "$DEST"
+    fi
+fi
+
+# Ignore stuff that shouldn't be on transfered to the destination
+if [ -f "$SCRIPT_DIR/do_rsync.exclude" ]; then
+    EXCLUDE="--exclude-from=$SCRIPT_DIR/do_rsync.exclude"
+fi
+
+# -------------------------
+# Setup commandline options
+# --whole-file 
+RSYNC="rsync --links --perms --times --owner --group --devices --specials" # => '-a'
+RSYNC="$RSYNC --archive --update --numeric-ids --timeout=120 --compress-level=5" # --archive => -rlptgoD
+RSYNC="$RSYNC --sparse --hard-links $DEEP $DELETE $EXCLUDE $SSH $DRYRUN "
+RSYNC="$RSYNC $VERBOSE $LINKS $ONE_FS"
+
+if [ -n "$SHOW" ]; then
+    echo "$RSYNC $SOURCES $DEST"
+else
+    # Do the rsync...
+    if [ -n "$LOOP" ]; then
+	while ! eval $RSYNC $SOURCES $DEST 2>&1; do
+	    echo "sleeping..."
+	    sleep 5
+	done
+    else
+	eval $RSYNC $SOURCES $DEST 2>&1
+    fi
+fi
+
+exit 0
