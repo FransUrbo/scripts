@@ -87,6 +87,9 @@ if [ -f $HOME/.disks ]; then
     DO_WARRANTY=1
 fi
 
+DO_VDEV_ALIAS=0
+[ -d /dev/disk/by-vdev ] && DO_VDEV_ALIAS=1
+
 TEMP_FILE=$(tempfile -d /tmp -p dsk.)
 DO_REV=1 ; DO_MACHINE_READABLE=0 ; DO_WWN=0 ; DO_SERIAL=1
 
@@ -99,15 +102,16 @@ while true ; do
 	--no-zfs)		DO_ZFS=0		; shift ;;
 	--no-lvm)		DO_LVM=0		; shift ;;
 	--no-md)		DO_MD=0			; shift ;;
-        --no-dmcrypt)		DO_DMCRYPT=0		; shift ;;
+	--no-dmcrypt)		DO_DMCRYPT=0		; shift ;;
 	--no-location)		DO_LOCATION=0		; shift ;;
 	--no-warranty)		DO_WARRANTY=0		; shift ;;
 	--no-rev)		DO_REV=0		; shift ;;
 	--no-serial)		DO_SERIAL=0		; shift ;;
+	--no-vdev-alias)	DO_VDEV_ALIAS=0		; shift ;;
 	--machine-readable)	DO_MACHINE_READABLE=1	; shift ;;
 	--use-wwn)		DO_WWN=1		; shift ;;
 	--help|-h)
-	    echo "Usage: `basename $0` [--no-zfs|--no-lvm|--no-md|--no-dmcrypt|--no-location|--no-warranty|--no-rev|--no-serial|--machine-readable]"
+	    echo "Usage: `basename $0` [--no-zfs|--no-lvm|--no-md|--no-dmcrypt|--no-location|--no-warranty|--no-rev|--no-serial|--no-vdev-alias|--machine-readable]"
 	    echo
 	    exit 0
 	    ;;
@@ -121,7 +125,9 @@ done
 if [ "$DO_MACHINE_READABLE" == 1 ]; then
     echo -n "CTRL;Host;"
     [ "$DO_LOCATION" == 1 ] && echo -n "PHY;"
-    echo -n "Name;Model;"
+    echo -n "Name;"
+    [ "$DO_VDEV_ALIAS" == 1 ] && echo -n "VDEV_ALIAS;"
+    echo -n "Model;"
     if [ "$DO_WWN" == 0 ]; then
 	echo "Device by ID;"
     else
@@ -139,7 +145,9 @@ if [ "$DO_MACHINE_READABLE" == 1 ]; then
 else
     printf "  %-15s" "Host" 
     [ "$DO_LOCATION" == 1 ] && printf "%-4s" "PHY"
-    printf " %-4s %-20s" "Name" "Model"
+    printf " %-6s " "Name"
+    [ "$DO_VDEV_ALIAS" == 1 ] && printf "%-15s" "VDEV Alias"
+    printf " %-20s" "Model"
     if [ "$DO_WWN" == 0 ]; then
 	printf "%-45s" "Device by ID"
     else
@@ -176,6 +184,7 @@ lspci -D > $PCI_DEVS
  cat $PCI_DEVS | grep -E 'SCSI|RAID' ; \
  cat $PCI_DEVS | grep -E 'FireWire|IEEE' ; \
  cat $PCI_DEVS | grep -E 'USB' | grep -v OHCI) | \
+    sort | uniq | \
     while read line; do
 	ctrl_id=${line%% *}
 
@@ -311,10 +320,21 @@ lspci -D > $PCI_DEVS
 				fi
 
 				# ----------------------
+				# Try to map the device name to the kernel 'ataXX' message.
+				ataXX=$(readlink /sys/block/$name | perl -ne'm{/(ata\d+)/} && print "$1\n"')
+				echo "$name: '$ataXX'" >> /tmp/xyz
+
+				# ----------------------
 				# Get all info availible for $name
 				if [ -n "$name" -a "$name" != "n/a" ]; then
 				    udevadm info -q all -p /sys/block/$name > $TEMP_FILE
 				fi
+
+				# ----------------------
+				# Get vdev alias
+				vdev_alias=
+				set -- `ls -l /dev/disk/by-vdev/ | grep -E "/$name\$"`
+				vdev_alias="$9"
 
 				# ----------------------
 				# Get dev path
@@ -675,7 +695,9 @@ lspci -D > $PCI_DEVS
 				if [ "$DO_MACHINE_READABLE" == 1 ]; then
 				    echo -n "$ctrl;$host;"
 				    [ "$DO_LOCATION" == 1 ] && echo -n "$location;"
-				    echo -n "$name;$model;$device_id;"
+				    echo -n "$name;"
+				    [ "$DO_VDEV_ALIAS" == 1 ] && echo -n "$vdev_alias;"
+				    echo -n "$model;$device_id;"
 				    [ "$DO_REV" == 1 ] && echo -n "$rev;"
 				    [ "$DO_SERIAL" == 1 ] && echo -n "$serial;"
 				    [ "$DO_WARRANTY" == 1 ] && echo -n "$warranty;"
@@ -688,7 +710,9 @@ lspci -D > $PCI_DEVS
 				else
 				    printf "  %-15s" "$host"
 				    [ "$DO_LOCATION" == 1 ] && printf "%-4s" "$location"
-				    printf " %-4s %-20s%-45s" "$name" "$model" "$device_id"
+				    printf " %-6s" "$name"
+				    [ "$DO_VDEV_ALIAS" == 1 ] && printf "%-15s" "$vdev_alias"
+				    printf " %-20s%-45s" "$model" "$device_id"
 				    [ "$DO_REV" == 1 ] && printf "%-10s" "$rev"
 				    [ "$DO_SERIAL" == 1 ] && printf "%-25s" "$serial"
 				    [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "$warranty"
