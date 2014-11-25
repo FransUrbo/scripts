@@ -83,8 +83,9 @@ while true; do
 			    DEST="$1"
 			    break
 		    else
-			    s=`echo "$1" | sed 's@/$@@'`
-			    SOURCES="$SOURCES \"$s\""
+#			    s=`echo "$1" | sed 's@/$@@'`
+#			    SOURCES="$SOURCES \"$s\""
+			    SOURCES="$SOURCES \"$1\""
 			    shift
 		    fi
 	    done
@@ -97,10 +98,12 @@ done
 
 [ -z "$SOURCES" -a -z "$DEST" ] && help
 if echo "$SOURCES" | grep -q ':'; then
-    SSH="--rsh=ssh --no-motd"
+    #SSH="--rsh=ssh --no-motd"
+    SSH="--no-motd -e 'ssh -c arcfour'"
 else
     if echo "$DEST" | grep -q ':'; then
-	SSH="--rsh=ssh --no-motd"
+	#SSH="--rsh=ssh --no-motd"
+	SSH="--no-motd -e 'ssh -c arcfour'"
     else
 	# Not a remote dir - create it if it doesn't exist
 	DEST="`echo \"$DEST\" | sed 's@/$@@'`"
@@ -118,7 +121,7 @@ fi
 # --whole-file 
 RSYNC="rsync --links --perms --times --owner --group --devices --specials" # => '-a'
 RSYNC="$RSYNC --archive --update --numeric-ids --timeout=120 --compress-level=5" # --archive => -rlptgoD
-RSYNC="$RSYNC --sparse --hard-links $DEEP $DELETE $EXCLUDE $SSH $DRYRUN "
+RSYNC="$RSYNC --sparse --hard-links --whole-file $DEEP $DELETE $EXCLUDE $SSH $DRYRUN "
 RSYNC="$RSYNC $VERBOSE $LINKS $ONE_FS"
 
 if [ -n "$SHOW" ]; then
