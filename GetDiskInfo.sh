@@ -125,7 +125,7 @@ done
 if [ "$DO_MACHINE_READABLE" == 1 ]; then
     echo -n "CTRL;Host;"
     [ "$DO_LOCATION" == 1 ] && echo -n "PHY;"
-    echo -n "Name;"
+    echo -n "Name;ataXX;"
     [ "$DO_VDEV_ALIAS" == 1 ] && echo -n "VDEV_ALIAS;"
     echo -n "Model;"
     if [ "$DO_WWN" == 0 ]; then
@@ -145,7 +145,7 @@ if [ "$DO_MACHINE_READABLE" == 1 ]; then
 else
     printf "  %-15s" "Host" 
     [ "$DO_LOCATION" == 1 ] && printf "%-4s" "PHY"
-    printf " %-6s " "Name"
+    printf " %-6s %-10s" "Name" "ataXX"
     [ "$DO_VDEV_ALIAS" == 1 ] && printf "%-15s" "VDEV Alias"
     printf " %-20s" "Model"
     if [ "$DO_WWN" == 0 ]; then
@@ -321,8 +321,16 @@ lspci -D > $PCI_DEVS
 
 				# ----------------------
 				# Try to map the device name to the kernel 'ataXX' message.
-				ataXX=$(readlink /sys/block/$name | perl -ne'm{/(ata\d+)/} && print "$1\n"')
-				echo "$name: '$ataXX'" >> /tmp/xyz
+                                # The 'correct' way.
+				ataXX=$(readlink /sys/block/$name | sed "s@.*\(ata[0-9]\+\).*@\1@")
+                                if echo "$ataXX" | grep -q /; then
+				    # SAS devices don't have a 'ataXX' name in the path.
+				    # Try the more complicated way
+				    ataXX=$(grep 'ata[0-9]\+.[0-9][0-9]: ATA-' /var/log/dmesg | \
+					sed "s@.*ata\([0-9]\+\.[0-9]\+\).*@\1@" | \
+					awk ' { a="ata" $1; printf("%s is /dev/sd%c\n", a, 96+NR); }' |\
+					grep "/$name\$" | sed 's@ .*@@')
+                                fi
 
 				# ----------------------
 				# Get all info availible for $name
@@ -493,6 +501,9 @@ lspci -D > $PCI_DEVS
 				    fi
 				    if [ "$model" != 'n/a' -a "$serial" != 'n/a' ]; then
 					zfs_regexp="$zfs_regexp|$model-.*_$serial"
+				    fi
+				    if [ -n "$vdev_alias" ]; then
+					zfs_regexp="$zfs_regexp|$vdev_alias"
 				    fi
 
 				    # Make sure we only match the whole word (not 'test2' if searching for/with 'test').
@@ -695,7 +706,7 @@ lspci -D > $PCI_DEVS
 				if [ "$DO_MACHINE_READABLE" == 1 ]; then
 				    echo -n "$ctrl;$host;"
 				    [ "$DO_LOCATION" == 1 ] && echo -n "$location;"
-				    echo -n "$name;"
+				    echo -n "$name;$ataXX"
 				    [ "$DO_VDEV_ALIAS" == 1 ] && echo -n "$vdev_alias;"
 				    echo -n "$model;$device_id;"
 				    [ "$DO_REV" == 1 ] && echo -n "$rev;"
@@ -710,7 +721,7 @@ lspci -D > $PCI_DEVS
 				else
 				    printf "  %-15s" "$host"
 				    [ "$DO_LOCATION" == 1 ] && printf "%-4s" "$location"
-				    printf " %-6s" "$name"
+				    printf " %-6s %-10s" "$name" "$ataXX"
 				    [ "$DO_VDEV_ALIAS" == 1 ] && printf "%-15s" "$vdev_alias"
 				    printf " %-20s%-45s" "$model" "$device_id"
 				    [ "$DO_REV" == 1 ] && printf "%-10s" "$rev"
