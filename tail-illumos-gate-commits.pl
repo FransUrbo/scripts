@@ -2,6 +2,7 @@
 
 $DEBUG = 0;
 $ZFS_SRC_DIR = "/usr/src/zfs";
+$MAIL_RECIPIENT = "turbo\@bayour.com";
 
 chdir("$ZFS_SRC_DIR")
     || die("Can't chdir into $ZFS_SRC_DIR, $!\n");
@@ -30,7 +31,9 @@ while(! eof(GIT_LOG)) {
 close(GIT_LOG);
 
 $ENV{'LOGNAME'} = "Illumos-gate commit watcher";
-$ENV{'REPLYTO'} = "turbo\@bayour.com";
+if(! defined($ENV{'REPLYTO'})) {
+    $ENV{'REPLYTO'} = $MAIL_RECIPIENT;
+}
 
 for(my $commit_nr = $#COMMIT; $commit_nr > 0; $commit_nr--) {
     $zfs_related = 0;
@@ -67,12 +70,12 @@ for(my $commit_nr = $#COMMIT; $commit_nr > 0; $commit_nr--) {
     }
 
     if(! $DEBUG) {
-	open(MAIL, "| mailx -s \"New illumos-gate commit - $SUBJS[$commit_nr]\" turbo\@bayour.com")
+	open(MAIL, "| mailx -s \"New illumos-gate commit - $SUBJS[$commit_nr]\" $ENV{'REPLYTO'}")
 	    || die("Can't pipe to 'mailx', $!\n");
 	$fb = MAIL;
     } else {
 	$fb = STDOUT;
-	print $fb "mailx -s \"New illumos-gate commit - $SUBJS[$commit_nr]\" turbo\@bayour.com\n";
+	print $fb "mailx -s \"New illumos-gate commit - $SUBJS[$commit_nr]\" $ENV{'REPLYTO'}\n";
     }
 
     my @commit = @{$COMMIT[$commit_nr]};
