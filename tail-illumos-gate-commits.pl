@@ -62,16 +62,17 @@ for(my $commit_nr = $#COMMIT; $commit_nr > 0; $commit_nr--) {
 	    $subj =~ s/\"/\\\"/;
 	    while($subj =~ s/^\ //) { ; }
 
-	    push(@SUBJS, $subj);
+	    $SUBJS[$commit_nr] = $subj;
 	}
     }
 
     if(! $DEBUG) {
-	open(MAIL, "| mailx -s \"New illumos-gate commit - $SUBJS[0]\" turbo\@bayour.com")
+	open(MAIL, "| mailx -s \"New illumos-gate commit - $SUBJS[$commit_nr]\" turbo\@bayour.com")
 	    || die("Can't pipe to 'mailx', $!\n");
 	$fb = MAIL;
     } else {
 	$fb = STDOUT;
+	print $fb "mailx -s \"New illumos-gate commit - $SUBJS[$commit_nr]\" turbo\@bayour.com\n";
     }
 
     my @commit = @{$COMMIT[$commit_nr]};
@@ -94,7 +95,7 @@ for(my $commit_nr = $#COMMIT; $commit_nr > 0; $commit_nr--) {
     close(MAIL) if(!$DEBUG);
 }
 
-if($COMMIT[1][0]) {
+if($COMMIT[1][0] && !$DEBUG) {
     my $commit = (split(' ', $COMMIT[1][0]))[1];
     if($commit) {
 	open(LATEST, "> /var/cache/illumos-gate")
