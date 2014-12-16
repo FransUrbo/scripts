@@ -1,18 +1,27 @@
 #!/usr/bin/perl -w
 
+# You need to have ZoL checked out in /usr/src
+# and a illumos remote added to it:
+#	git remote add illumos https://github.com/illumos/illumos-gate.git
+
 $DEBUG = 0;
 $ZFS_SRC_DIR = "/usr/src/zfs";
 $MAIL_RECIPIENT = "turbo\@bayour.com";
 
+# ------------------------------------------------
+
+# Go to ZoL source code directory
 chdir("$ZFS_SRC_DIR")
     || die("Can't chdir into $ZFS_SRC_DIR, $!\n");
 system("git fetch illumos");
 
+# Get the last commit sha1 we checked
 open(LATEST, "/var/cache/illumos-gate")
     || die("Can't open latest tag info, $!\n");
 $latest = <LATEST>; chomp($latest);
 close(LATEST);
 
+# Get all the commits since last check
 $i = 0; $j = 0;
 open(GIT_LOG, "git log $latest..illumos/master |")
     || die("Can't run git log, $!\n");
@@ -35,6 +44,8 @@ if(! defined($ENV{'REPLYTO'})) {
     $ENV{'REPLYTO'} = $MAIL_RECIPIENT;
 }
 
+# Go through each commit, looking for something that might be
+# ZFS related and relevant to ZoL.
 for(my $commit_nr = $#COMMIT; $commit_nr > 0; $commit_nr--) {
     $zfs_related = 0;
 
@@ -59,6 +70,7 @@ for(my $commit_nr = $#COMMIT; $commit_nr > 0; $commit_nr--) {
 
     next if(! $zfs_related);
 
+    # Get the mail subject - first line of the body
     for(my $i=4; $COMMIT[$commit_nr][$i]; $i++) {
 	if($COMMIT[$commit_nr][$i] =~ /^    [0-9][0-9][0-9][0-9] /) {
 	    my $subj = $COMMIT[$commit_nr][$i];
@@ -69,6 +81,7 @@ for(my $commit_nr = $#COMMIT; $commit_nr > 0; $commit_nr--) {
 	}
     }
 
+    # Setup mail pipe.
     if(! $DEBUG) {
 	open(MAIL, "| mailx -s \"New illumos-gate commit - $SUBJS[$commit_nr]\" $ENV{'REPLYTO'}")
 	    || die("Can't pipe to 'mailx', $!\n");
@@ -78,12 +91,14 @@ for(my $commit_nr = $#COMMIT; $commit_nr > 0; $commit_nr--) {
 	print $fb "mailx -s \"New illumos-gate commit - $SUBJS[$commit_nr]\" $ENV{'REPLYTO'}\n";
     }
 
+    # Output the commit message (the mail body).
     my @commit = @{$COMMIT[$commit_nr]};
     for(my $line_nr = 0; $line_nr <= $#commit; $line_nr++) {
 	print $fb "    $COMMIT[$commit_nr][$line_nr]\n";
     }
     print $fb "\n";
 
+    # Rest of the mail body - the references to the issue/pull request.
     print $fb "    References:\n";
     $commit = (split(' ', $COMMIT[$commit_nr][0]))[1];
     print $fb "      https://github.com/illumos/illumos-gate/commit/$commit\n";
@@ -98,6 +113,7 @@ for(my $commit_nr = $#COMMIT; $commit_nr > 0; $commit_nr--) {
     close(MAIL) if(!$DEBUG);
 }
 
+# Update the 'last illumos commit' sha
 if($COMMIT[1][0] && !$DEBUG) {
     my $commit = (split(' ', $COMMIT[1][0]))[1];
     if($commit) {
