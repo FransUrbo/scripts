@@ -1,6 +1,8 @@
 #!/usr/bin/perl -w
 
 # You need to have ZoL checked out in /usr/src
+#	cd /usr/src
+#	git clone https://github.com/zfsonlinux/zfs.git
 # and a illumos remote added to it:
 #	git remote add illumos https://github.com/illumos/illumos-gate.git
 
