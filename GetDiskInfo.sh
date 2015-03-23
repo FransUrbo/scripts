@@ -111,7 +111,7 @@ while true ; do
 	--machine-readable)	DO_MACHINE_READABLE=1	; shift ;;
 	--use-wwn)		DO_WWN=1		; shift ;;
 	--help|-h)
-	    echo "Usage: `basename $0` [--no-zfs|--no-lvm|--no-md|--no-dmcrypt|--no-location|--no-warranty|--no-rev|--no-serial|--no-vdev-alias|--machine-readable]"
+	    echo "Usage: `basename $0` [--no-zfs|--no-lvm|--no-md|--no-dmcrypt|--no-location|--no-warranty|--no-rev|--no-serial|--no-vdev-alias|--machine-readable|--use-wwn]"
 	    echo
 	    exit 0
 	    ;;
