@@ -10,6 +10,15 @@ die() {
 	exit 1
 }
 
+help() {
+	echo "Usage: `basename` $0 [-b block_device] [-c] [-o os] [-v os_version] [-z zvol]"
+	echo "       -b [block_device]   Create pool on [block device]"
+	echo "       -o [os]             OS to install [gentoo or debian]"
+	echo "       -v [os_version]     OS version to install [wheezy or jessie]"
+	echo "       -z [zvol]           Create a 20GB ZVOL to install on (and create an ext4 fs on)"
+	exit 0
+}
+
 while getopts ":b:o:v:z:" opt; do
 	case $opt in
 	b)
@@ -24,12 +33,7 @@ while getopts ":b:o:v:z:" opt; do
 		die "Option -$OPTARG requires an argument."
 		;;
 	h)
-		echo "Usage: `basename` $0 [-b block_device] [-c] [-o os] [-v os_version] [-z zvol]"
-                echo "       -b [block_device]   Create pool on [block device]"
-		echo "       -o [os]             OS to install [gentoo or debian]"
-                echo "       -v [os_version]     OS version to install [wheezy or jessie]"
-		echo "       -z [zvol]           Create a 20GB ZVOL to install on (and create an ext4 fs on)"
-                exit 0
+		help
                 ;;
 	o)
 		OS=${OPTARG}
@@ -45,8 +49,6 @@ while getopts ":b:o:v:z:" opt; do
                 ;;
 	esac
 done
-
-MOUNTPOINT="${TEMPDIR}/${TNAME}"
 
 # Create pool and root filesystem
 create_pool_fs()
@@ -87,7 +89,9 @@ create_pool_fs()
 create_zvol()
 {
 	zfs create -V20G -s -o primarycache=none -o secondarycache=none -o compression=lz4 -o volblocksize=8K "${ZVOL}"
-	sleep 5 # Just give udevd a couple of seconds...
+        while [ ! -e "/dev/zvol/${ZVOL}" ]; do
+		sleep 1  # Just give udevd a couple of seconds...
+        done
 	mke2fs -j "/dev/zvol/${ZVOL}"
         mount "/dev/zvol/${ZVOL}" ${MOUNTPOINT}
 }
@@ -112,7 +116,7 @@ mount --rbind {/mnt,}/sys
 mount -t proc none /proc
 umount -l /tmp
 exec bash
-PS1="(gentoo-zfs) $PS1"
+PS1="(${OS}-zfs) $PS1"
 cd
 
 # Get portage snapshot (use OSUOSL mirror because it is usually fast)
@@ -182,7 +186,7 @@ mount --rbind {/mnt,}/sys
 mount -t proc none /proc
 umount -l /tmp
 exec bash
-PS1="(gentoo-zfs) $PS1"
+PS1="(${OS}-zfs) $PS1"
 cd
 
 # Install ZFS and GRUB2
@@ -199,7 +203,8 @@ END
 
 # ---------------------------------------------------------
 
-# Create pool, filesystem or zvol.
+# Create pool+filesystem or zvol.
+MOUNTPOINT="${TEMPDIR}/${TNAME}"
 if [ -n "$BLOCK_DEV" ]; then
 	create_pool_fs
 elif [ -n "$ZVOL" ]; then
