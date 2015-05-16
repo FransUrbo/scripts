@@ -11,13 +11,21 @@ die() {
 }
 
 help() {
-	echo "Usage: `basename` $0 [-b block_device] [-c] [-o os] [-v os_version] [-z zvol]"
+	echo "Usage: `basename $0` [-b block_device] [-c] [-o os] [-v os_version] [-z zvol]"
 	echo "       -b [block_device]   Create pool on [block device]"
 	echo "       -o [os]             OS to install [gentoo or debian]"
-	echo "       -v [os_version]     OS version to install [wheezy or jessie]"
+	echo "       -v [os_version]     OS version/name to install"
 	echo "       -z [zvol]           Create a 20GB ZVOL to install on (and create an ext4 fs on)"
 	exit 0
 }
+
+wait_dev() {
+	while [ ! -e "$1" ]; do
+		sleep 1
+	done
+}
+
+[ -z "$1" ] && help
 
 while getopts ":b:o:v:z:" opt; do
 	case $opt in
@@ -45,14 +53,13 @@ while getopts ":b:o:v:z:" opt; do
 		[ -n "$BLOCK_DEV" ] && die "-b and -z is mutually exclusive."
                 [ ! -d "/dev/zvol" ] && die "No /dev/zvol directory, can't create zvol."
 
-		ZVOL=${OPTARG}
+		ZVOL=${OPTARG#/dev/zvol/} # Remove /dev/zvol/ just in-case.
                 ;;
 	esac
 done
 
 # Create pool and root filesystem
-create_pool_fs()
-{
+create_pool_fs() {
 	# XXX: It is possible to specify an invalid block device, but it won't appear here due to readlink
 	[ -b "${BLOCK_DEV}" ] || die "Invalid block device '${BLOCK_DEV}' specified."
 
@@ -86,18 +93,40 @@ create_pool_fs()
 	zfs create -o mountpoint=/var/tmp/ccache -o compression=lz4 ${TNAME}/$OS/ccache
 }
 
-create_zvol()
-{
+create_zvol() {
+	# Create ZVOL
 	zfs create -V20G -s -o primarycache=none -o secondarycache=none -o compression=lz4 -o volblocksize=8K "${ZVOL}"
-        while [ ! -e "/dev/zvol/${ZVOL}" ]; do
-		sleep 1  # Just give udevd a couple of seconds...
-        done
-	mke2fs -j "/dev/zvol/${ZVOL}"
-        mount "/dev/zvol/${ZVOL}" ${MOUNTPOINT}
+	[ "$?" -gt 0 ] && die "Couldn't create ZVOL"
+
+	# Wait for device
+	wait_dev "/dev/zvol/${ZVOL}"
+
+	# Partition ZVOL device
+	parted /dev/zvol/${ZVOL} mklabel msdos
+	parted -a optimal /dev/zvol/${ZVOL} <<EOF
+unit MB 
+mkpart primary ext4 1 100 
+mkpart primary linux-swap 100 2048
+mkpart primary ext4 2048 100%
+set 1 boot on
+quit
+EOF
+	# Wait for first partition
+	wait_dev "/dev/zvol/${ZVOL}-part1"
+
+	# Create filesystems on ZVOL device partitions
+	mke2fs -j "/dev/zvol/${ZVOL}-part1"
+	mkswap -f "/dev/zvol/${ZVOL}-part2"
+	mke2fs -j "/dev/zvol/${ZVOL}-part3"
+
+	# Mount ZVOL device
+	[ ! -d ${MOUNTPOINT} ] && mkdir -p ${MOUNTPOINT}
+        mount -t ext4 "/dev/zvol/${ZVOL}-part3" ${MOUNTPOINT}
+	mkdir ${MOUNTPOINT}/boot
+	mount -t ext4 "/dev/zvol/${ZVOL}-part1" ${MOUNTPOINT}/boot
 }
 
-install_gentoo()
-{
+install_gentoo() {
 	# Setup rootfs
 	wget 'ftp://gentoo.osuosl.org/pub/gentoo/releases/amd64/autobuilds/current-stage3-amd64/stage3-amd64-[0-9]*.tar.bz2' \
 		|| die "Could not fetch tarball"
@@ -172,13 +201,12 @@ genkernel all --makeopts=\""${MAKEOPTS}"\" --no-clean --no-mountboot --zfs --boo
 END
 }
 
-install_debian()
-{
-	type debootstrap > /dev/null 2>&1 || die "ERROR: debootstrap is missing"
+install_debian() {
+	type debootstrap > /dev/null 2>&1 || die "ERROR: command 'debootstrap' is missing"
         [ -z "$OSVERSION" ] && die "-v is required"
 
 	unshare -m /bin/bash << END
-debootstrap $OSVERSION ${MOUNTPOINT}
+debootstrap ${OSVERSION} ${MOUNTPOINT}
 
 pivot_root "${MOUNTPOINT}" "${MOUNTPOINT}/mnt"
 mount --rbind {/mnt,}/dev
@@ -189,15 +217,29 @@ exec bash
 PS1="(${OS}-zfs) $PS1"
 cd
 
-# Install ZFS and GRUB2
-apt-get -y install lsb-release
+# Install kernel and miscellaneous packages
+apt-get -y install linux-image-amd64 lsb-release less
+
+# Install ZFS and GRUB2 packages
 wget http://archive.zfsonlinux.org/debian/pool/main/z/zfsonlinux/zfsonlinux_6_all.deb
 dpkg -i zfsonlinux_6_all.deb
 apt-get update
 apt-get -y install debian-zfs grub-common grub-pc grub-pc-bin grub2-common
 
-# Install GRUB2
-grub-install "/dev/zvol/${ZVOL}"
+# Disable systemd
+if [ "${OSVERSION}" == "jessie" ]; then
+	apt-get -y install sysvinit-core sysvinit sysvinit-utils
+	apt-get -y remove --purge --auto-remove systemd
+	echo -e 'Package: systemd\nPin: origin ""\nPin-Priority: -1' > /etc/apt/preferences.d/systemd
+	echo -e 'Package: *systemd*\nPin: origin ""\nPin-Priority: -1' > /etc/apt/preferences.d/systemd
+fi
+
+# Install GRUB2 on device/zvol
+if [ -d "${BLOCK_DEV}" ]; then
+	grub-install "${BLOCK_DEV}"
+elif [ -d "${ZVOL}" ]; then
+	grub-install "/dev/zvol/${ZVOL}"
+fi
 END
 }
 
@@ -213,7 +255,7 @@ fi
 
 # Do the install
 cd "${MOUNTPOINT}"
-func=$(eval echo install_$os)
+func=$(eval echo install_$OS)
 type $func > /dev/null 2>&1 || die "ERROR: Unsupported OS"
 $func
 
@@ -225,8 +267,9 @@ if [ -n "$BLOCK_DEV" ]; then
 
 	echo "New $OS ZFS system installed on ${BLOCK_DEV}"
 elif [ -n "$ZVOL" ]; then
-	zfs snapshot ${ZVOL}@install
+        umount ${MOUNTPOINT}/boot
         umount ${MOUNTPOINT}
+	zfs snapshot ${ZVOL}@install
 
 	echo "New $OS ZFS system installed on ${ZVOL}"
 fi
