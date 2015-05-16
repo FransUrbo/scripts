@@ -124,6 +124,13 @@ EOF
         mount -t ext4 "/dev/zvol/${ZVOL}-part3" ${MOUNTPOINT}
 	mkdir ${MOUNTPOINT}/boot
 	mount -t ext4 "/dev/zvol/${ZVOL}-part1" ${MOUNTPOINT}/boot
+
+	if [ "$OS" = "gentoo" ]; then
+		mkdir -p ${MOUNTPOINT}/usr/portage/distfiles
+		mkdir -p ${MOUNTPOINT}/usr/portage/packages
+		mkdir -p ${MOUNTPOINT}/var/tmp/portage
+		mkdir -p ${MOUNTPOINT}/var/tmp/ccache
+	fi
 }
 
 install_gentoo() {
