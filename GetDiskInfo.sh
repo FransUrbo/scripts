@@ -328,9 +328,13 @@ lspci -D > $PCI_DEVS
                                 if echo "$ataXX" | grep -q /; then
 				    # SAS devices don't have a 'ataXX' name in the path.
 				    # Try the more complicated way
-				    ataXX=$(grep 'ata[0-9]\+.[0-9][0-9]: ATA-' /var/log/dmesg | \
-					sed "s@.*ata\([0-9]\+\.[0-9]\+\).*@\1@" | \
-					awk ' { a="ata" $1; printf("%s is /dev/sd%c\n", a, 96+NR); }' |\
+                                    # NOTE: A usb stick doesn't get a 'ataXX' unit. But still
+                                    #       catch this. Hopefully "idProduct=5571" IS a USB
+                                    #       stick!
+				    ataXX=$((cat /var/log/dmesg ; dmesg) | \
+                                        egrep 'ata[0-9].*: ATA-|usb .*: New USB device found.*idProduct=5571' | \
+					sed -e "s@.*ata\([0-9]\+\.[0-9]\+\).*@\1@" -e "s@.* usb \([0-9]-[0-9]\): .*@usb\1@" | \
+					awk '{ a=$1; printf("%s is /dev/sd%c\n", a, 96+NR); }' |\
 					grep "/$name\$" | sed 's@ .*@@')
                                 fi
 
