@@ -5,7 +5,7 @@
 # Released under the GPL (version of your choosing).
 
 # The following commands improve output, but is not required:
-#   zpool, pvs, cryptsetup, bc
+#   zpool, pvs, cryptsetup, bc, lshw
 # 
 # The following command is not required, but they should really
 # exist for best usage:
@@ -178,6 +178,82 @@ get_udev_info () {
 }
 
 # --------------
+declare -A DISK
+load_lshw_info () {
+    type lshw > /dev/null 2>&1 || return
+
+    local dev
+    declare -A disk
+
+    while read line; do
+	# New disk!
+	echo "${line}" | grep -Eq "^*-disk:.*[0-9]$" && disk=""
+
+	if echo "${line}" | grep -Eq "^description: "; then
+	    disk[description]="${line##description: }"
+	elif echo "${line}" | grep -Eq "^product: "; then
+	    disk[product]="${line##product: }"
+	elif echo "${line}" | grep -Eq "^vendor: "; then
+	    disk[vendor]="${line##vendor: }"
+	elif echo "${line}" | grep -Eq "^physical id: "; then
+	    disk[physical_id]="${line##physical id: }"
+	elif echo "${line}" | grep -Eq "^bus info: "; then
+	    disk[bus_info]="${line##bus info: }"
+	elif echo "${line}" | grep -Eq "^logical name: "; then
+	    disk[logical_name]="${line##logical name: }"
+	elif echo "${line}" | grep -Eq "^version: "; then
+	    disk[version]="${line##version: }"
+	elif echo "${line}" | grep -Eq "^serial: "; then
+	    disk[serial]="${line##serial: }"
+	elif echo "${line}" | grep -Eq "^size: "; then
+	    disk[size]="$(echo "${line}" | sed "s,size: \(.*\) .*,\1,")"
+	elif echo "${line}" | grep -Eq "^capabilities: "; then
+	    disk[capabilities]="${line##capabilities: }"
+	elif echo "${line}" | grep -Eq "^configuration: "; then
+	    disk[configuration]="${line##configuration: }"
+	fi
+
+	dev="${disk[logical_name]}"
+	[ -z "${dev}" ] && continue
+
+	if [ -n "${disk[description]}"   -a -n "${disk[product]}" -a \
+	     -n "${disk[vendor]}"        -a -n "${disk[physical_id]}" -a \
+	     -n "${disk[bus_info]}"      -a -n "${disk[logical_name]}" -a \
+	     -n "${disk[version]}"       -a -n "${disk[serial]}" -a \
+	     -n "${disk[size]}"          -a -n "${disk[capabilities]}" -a \
+	     -n "${disk[configuration]}" -a -z "${DISK[${dev}]}" ]
+	then
+	    DISK[${dev}]="${dev}:${disk[vendor]}:${disk[product]}:${disk[version]}:${disk[serial]}:${disk[size]}"
+	fi
+    done <<EOF
+$(lshw -class disk 2> /dev/null)
+EOF
+}
+load_lshw_info
+
+get_lshw_info () {
+    local val="$1"
+    local dev="$2"
+
+    IFS=":"
+    set -- $(echo "${DISK[$dev]}")
+
+    if [ "${val}" == "vendor" ]; then
+	echo "$2"
+    elif [ "${val}" == "product" ]; then
+	echo "$3"
+    elif [ "${val}" == "version" ]; then
+	echo "$4"
+    elif [ "${val}" == "serial" ]; then
+	echo "$5"
+    elif [ "${val}" == "size" ]; then
+	echo "$6"
+    fi
+}
+
+# --------------
+load_lshw_info # Initialize the DISK array.
+
 # MAIN function - get a list of all PCI devices, extract storage devices.
 PCI_DEVS=$(tempfile -d /tmp -p pci.)
 lspci -D > $PCI_DEVS
@@ -671,10 +747,15 @@ lspci -D > $PCI_DEVS
 
 				# ----------------------
 				# Get model family
+				family=""
 				set -- $(smartctl -a $dev_path | grep -E '^Model Family:' | 
 					sed -e "s@.*  \(.*\)@\1@" -e 's@ (.*@@' \
 					    -e 's@ [0-9].*@@' -e 's@/.*@@')
-				[ -n "$*" ] && family="$*"
+				if [ -n "$*" ]; then
+				    family="$*"
+				else
+				    family="$(get_lshw_info "vendor" "$dev_path")"
+				fi
 
 				# ----------------------
 				# Get warranty information
