@@ -32,6 +32,10 @@
     echo "WARNING: This script really needs to run with root privilegues." \
     > /dev/stderr
 
+# Need a temp file to store variables inside while loops
+# which we need at the very end.
+DSK_TEMP=$(tempfile -d /tmp -p dsk.)
+
 # --------------
 # Set/figure out default output information
 DO_ZFS=0
@@ -636,6 +640,7 @@ lspci -D > $PCI_DEVS
 						fi
 					    elif [[ $zpool =~ replacing ]]; then
 						replacing="rpl"$(echo "$zpool" | sed "s@.*-\([0-9]\+\) .*@\1@")
+						echo 'replacing=1' >> "${DSK_TEMP}"
 						ii=1
 						continue
 
@@ -646,26 +651,26 @@ lspci -D > $PCI_DEVS
 						    offline="!"
 						    if [[ $zpool =~ OFFLINE ]]; then
 							offline="$offline"O
-							offline_type=O
+							echo 'offline_type=O' >> "${DSK_TEMP}"
 						    elif [[ $zpool =~ UNAVAIL ]]; then
 							offline="$offline"U
-							offline_type=U
+							echo 'offline_type=U' >> "${DSK_TEMP}"
 						    elif [[ $zpool =~ FAULTED ]]; then
 							offline="$offline"F
-							offline_type=F
+							echo 'offline_type=F' >> "${DSK_TEMP}"
 						    elif [[ $zpool =~ REMOVED ]]; then
 							offline="$offline"R
-							offline_type=R
+							echo 'offline_type=R' >> "${DSK_TEMP}"
 						    fi
 						elif [[ $zpool =~ resilvering ]]; then
 						    offline="$offline"rs
-						    resilvering=1
+						    echo 'resilvering=1' >> "${DSK_TEMP}"
 						fi
 
 						if [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]; then
 						    if [[ -n "$tmpdmname" && $zpool =~ $tmpdmname ]]; then
 							crypted="*"
-							have_dmcrypted=1
+							echo 'have_dmcrypted=1' >> "${DSK_TEMP}"
 						    fi
 						fi
 
@@ -842,14 +847,16 @@ lspci -D > $PCI_DEVS
     done
 
 if [ "$DO_MACHINE_READABLE" == 0 ]; then
-    [ -n "$have_dmcrypted" ] && echo "*  => is a dm-crypt device"
-    [ -n "$resilvering" ] && echo "rs => Resilvering"
-    [ "$offline_type" == "O" ] && echo "O  => Offline"
-    [ "$offline_type" == "U" ] && echo "U  => Unavail"
-    [ "$offline_type" == "F" ] && echo "F  => Faulted"
-    [ "$offline_type" == "R" ] && echo "R  => Removed"
+    grep -q '^have_dmcrypted=' "${DSK_TEMP}" && echo "*  => is a dm-crypt device"
+    grep -q '^resilvering=' "${DSK_TEMP}" && echo "rs  => Resilvering"
+    grep -q '^replacing=' "${DSK_TEMP}" && echo "rpl => Replacing"
+    grep -q '^offline_type=O' "${DSK_TEMP}" && echo "O  => Offline"
+    grep -q '^offline_type=U' "${DSK_TEMP}" && echo "U  => Unavail"
+    grep -q '^offline_type=F' "${DSK_TEMP}" && echo "F  => Faulted"
+    grep -q '^offline_type=R' "${DSK_TEMP}" && echo "R  => Removed"
 fi
 
 [ -f "$ZFS_TEMP" ] && rm -f "$ZFS_TEMP"
 [ -f "$LVM_TEMP" ] && rm -f "$LVM_TEMP"
+[ -f "$DSK_TEMP" ] && rm -f "$DSK_TEMP"
 rm -f $TEMP_FILE $PCI_DEVS
