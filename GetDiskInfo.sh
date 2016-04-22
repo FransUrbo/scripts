@@ -133,9 +133,9 @@ if [ "$DO_MACHINE_READABLE" == 1 ]; then
     [ "$DO_VDEV_ALIAS" == 1 ] && echo -n "VDEV_ALIAS;"
     echo -n "Model;"
     if [ "$DO_WWN" == 0 ]; then
-	echo "Device by ID;"
+	echo -n "Device by ID;"
     else
-	echo "Device by WWN;"
+	echo -n "Device by WWN;"
     fi
     [ "$DO_REV" == 1 ] && echo -n "Rev;"
     [ "$DO_SERIAL" == 1 ] && echo -n "Serial;"
@@ -145,7 +145,7 @@ if [ "$DO_MACHINE_READABLE" == 1 ]; then
     [ "$DO_LVM" == 1 ] && echo -n "VG;"
     [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ]  && echo -n "DM-CRYPT;"
     [ "$DO_ZFS" == 1 ] && echo -n "ZFS;"
-    echo "Mount Point;"
+    echo -n "Mount Point;"
     echo "Size"
 else
     printf "  %-15s" "Host" 
@@ -816,7 +816,7 @@ lspci -D > $PCI_DEVS
 				    [ "$DO_LVM" == 1 ] && echo -n "$vg;"
 				    [ "$DO_DMCRYPT" == 1 -a -n "$DMCRYPT" ] && echo -n "$dmcrypt;"
 				    [ "$DO_ZFS" == 1 ] && echo -n "$zfs;"
-				    echo "$mntpt;"
+				    echo -n "$mntpt;"
 				    echo "$size"
 				else
 				    printf "  %-15s" "$host"
