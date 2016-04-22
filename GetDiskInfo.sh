@@ -805,7 +805,7 @@ lspci -D > $PCI_DEVS
 				if [ "$DO_MACHINE_READABLE" == 1 ]; then
 				    echo -n "$ctrl;$host;"
 				    [ "$DO_LOCATION" == 1 ] && echo -n "$location;"
-				    echo -n "$name;$ataXX"
+				    echo -n "$name;$ataXX;"
 				    [ "$DO_VDEV_ALIAS" == 1 ] && echo -n "$vdev_alias;"
 				    echo -n "$model;$device_id;"
 				    [ "$DO_REV" == 1 ] && echo -n "$rev;"
