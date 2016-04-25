@@ -5,7 +5,7 @@
 # Released under the GPL (version of your choosing).
 
 # The following commands improve output, but is not required:
-#   zpool, pvs, cryptsetup, bc, lshw
+#   zpool, pvs, cryptsetup, bc, lshw, /usr/lib/nagios/plugins/check_ide_smart
 # 
 # The following command is not required, but they should really
 # exist for best usage:
@@ -94,6 +94,11 @@ fi
 DO_VDEV_ALIAS=0
 [ -d /dev/disk/by-vdev ] && DO_VDEV_ALIAS=1
 
+DO_SMART_CHK=0
+if [ -e /usr/lib/nagios/plugins/check_ide_smart ]; then
+    DO_SMART_CHK=1
+fi
+
 TEMP_FILE=$(tempfile -d /tmp -p dsk.)
 DO_REV=1 ; DO_MACHINE_READABLE=0 ; DO_WWN=0 ; DO_SERIAL=1
 
@@ -112,10 +117,11 @@ while true ; do
 	--no-rev)		DO_REV=0		; shift ;;
 	--no-serial)		DO_SERIAL=0		; shift ;;
 	--no-vdev-alias)	DO_VDEV_ALIAS=0		; shift ;;
+        --no-smart-check)	DO_SMART_CHK=0		; shift ;;
 	--machine-readable)	DO_MACHINE_READABLE=1	; shift ;;
 	--use-wwn)		DO_WWN=1		; shift ;;
 	--help|-h)
-	    echo "Usage: `basename $0` [--no-zfs|--no-lvm|--no-md|--no-dmcrypt|--no-location|--no-warranty|--no-rev|--no-serial|--no-vdev-alias|--machine-readable|--use-wwn]"
+	    echo "Usage: `basename $0` [--no-zfs|--no-lvm|--no-md|--no-dmcrypt|--no-location|--no-warranty|--no-rev|--no-serial|--no-vdev-alias|--no-smart-check|--machine-readable|--use-wwn]"
 	    echo
 	    exit 0
 	    ;;
@@ -140,6 +146,7 @@ if [ "$DO_MACHINE_READABLE" == 1 ]; then
     [ "$DO_REV" == 1 ] && echo -n "Rev;"
     [ "$DO_SERIAL" == 1 ] && echo -n "Serial;"
     [ "$DO_WARRANTY" == 1 ] && echo -n "Warranty;"
+    [ "$DO_SMART_CHK" == 1 ] && echo -n "SMART;"
     echo -n "Family;"
     [ "$DO_MD" == 1 ] && echo -n "MD;"
     [ "$DO_LVM" == 1 ] && echo -n "VG;"
@@ -161,6 +168,7 @@ else
     [ "$DO_REV" == 1 ] && printf "%-10s" "Rev"
     [ "$DO_SERIAL" == 1 ] && printf "%-25s" "Serial"
     [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "Warranty"
+    [ "$DO_SMART_CHK" == 1 ] && printf "%-6s" "SMART"
     printf "%-30s" "Family"
     [ "$DO_MD" == 1 ] && printf "%-10s" "MD"
     [ "$DO_LVM" == 1 ] && printf "%-10s" "VG"
@@ -782,6 +790,13 @@ lspci -D > $PCI_DEVS
 				fi
 
 				# ----------------------
+                                # Get SMART overall status
+                                if [ "$DO_SMART_CHK" == 1 ]; then
+                                    /usr/lib/nagios/plugins/check_ide_smart -d "$dev_path" -n > /dev/null 2>&1
+                                    [ "$?" == 0 ] && smart="OK" || smart="FAIL"
+                                fi
+
+				# ----------------------
 				# Get physical location
 				if [ "$DO_LOCATION" == 1 ]; then
 				    if [[ $model =~ " " ]]; then
@@ -811,6 +826,7 @@ lspci -D > $PCI_DEVS
 				    [ "$DO_REV" == 1 ] && echo -n "$rev;"
 				    [ "$DO_SERIAL" == 1 ] && echo -n "$serial;"
 				    [ "$DO_WARRANTY" == 1 ] && echo -n "$warranty;"
+                                    [ "$DO_SMART_CHK" == 1 ] && echo -n "$smart;"
 				    echo -n "$family;"
 				    [ "$DO_MD" == 1 ] && echo -n "$md;"
 				    [ "$DO_LVM" == 1 ] && echo -n "$vg;"
@@ -827,6 +843,7 @@ lspci -D > $PCI_DEVS
 				    [ "$DO_REV" == 1 ] && printf "%-10s" "$rev"
 				    [ "$DO_SERIAL" == 1 ] && printf "%-25s" "$serial"
 				    [ "$DO_WARRANTY" == 1 ] && printf "%-10s" "$warranty"
+                                    [ "$DO_SMART_CHK" == 1 ] && printf "%-6s" "$smart"
 				    printf "%-30s" "$family"
 				    [ "$DO_MD" == 1 ] && printf "%-10s" "$md"
 				    [ "$DO_LVM" == 1 ] && printf "%-10s" "$vg"
