@@ -100,6 +100,18 @@ echo "=> Update and commit the changelog"
 if [ "${BRANCH}" = "snapshot" ]; then
     dist="${DIST}-daily"
     msg="daily"
+
+    # Dirty hack, but it's the fastest, easiest way to solve
+    #   E: spl-linux changes: bad-distribution-in-changes-file sid-daily
+    # Don't know why I don't get that for '{wheezy,jessie}-daily as well,
+    # but we do this for all of them, just to make sure.
+    mkdir -p /usr/share/lintian/vendors/debian/main/data/changes-file
+    if [ ! -f "/usr/share/lintian/vendors/debian/main/data/changes-file/known-dists" ]
+    then
+	echo "${dist}" >  /usr/share/lintian/vendors/debian/main/data/changes-file/known-dists
+    else
+	echo "${dist}" >> /usr/share/lintian/vendors/debian/main/data/changes-file/known-dists
+    fi
 else
     dist="${DIST}"
     msg="upstream"
@@ -140,8 +152,7 @@ type git-buildpackage > /dev/null 2>&1 && \
     gbp="git-buildpackage" || gbp="gbp buildpackage"
 
 ${gbp} --git-ignore-branch --git-keyid="${GPKGKEYID}" --git-tag \
-       --git-ignore-new --git-builder="debuild -i -I -k${GPKGKEYID}" 
-
+       --git-ignore-new --git-builder="debuild -i -I -k${GPGKEYID}" 
 
 # ------------------------
 # --> F I N I S H  U P <--

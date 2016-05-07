@@ -57,7 +57,8 @@ if [ -z "${APP}" -o -z "${DIST}" -o -z "${BRANCH}" -o -z "${GITNAME}" \
 	-o -z "${GPGKEYID}" ]
 then
     echo -n "ERROR: One (or more) of APP, DIST, BRANCH, GITNAME, GITEMAIL, "
-    echo "GPGCACHEID and/or GPGPASS environment variable is missing!"
+    echo -n "GPGCACHEID, GPGPASS and/or GPGKEYID environment variable is "
+    echo "missing!"
     echo "Usage: $(basename "${0}") <app> <dist> <branch>"
     exit 1
 fi
