@@ -30,7 +30,7 @@ echo "${GPGPASS}" | /usr/lib/gnupg2/gpg-preset-passphrase  -v -c ${GPGCACHEID}
 # Go to the S3 repository 'checkout' and use reprepro to add the changes
 # to the repo.
 cd "${S3_REPO_DIR}"
-find "${INCOMING_DIR}"/*.changes 2> /dev/null | sort \
+find "${INCOMING_DIR}" -type f -name "*.changes" 2> /dev/null | sort | \
 while read changes; do
 	# Get the distribution from the changes file.
 	dist="$(grep "^Distribution:" "$changes" | sed 's@.*: @@')"

@@ -48,7 +48,43 @@ else
 	# TODO: !! Temporary solution !!
 	# Because snapshot is very behind my released versions, use the
 	# 'master' branch instead.
-	git checkout master/debian/${DIST}
+
+	# 1. Checkout master repository into a new snapshot branch
+	#    NOTE: This will need to be force pushed at the end.
+	git checkout -b ${BRANCH}/debian/${DIST} ${APP}/master
+
+	# 2. Get the debian directory from the master branch.
+	git checkout pkg-${APP}/master/debian/${DIST} -- debian
+
+	if [ "${APP}" = "xxx" ]; then
+	    # TODO: The ZFS patches needs to be updated
+	    # 3. Update debian patches.
+	    for patch in 0002-Prevent-manual-builds-in-the-DKMS-source.patch \
+			     PR1099.patch PR1476.patch PR3465.patch \
+			     libzfs-dependencies
+	    do
+		curl http://bayour.com/misc/${patch} \
+		     > debian/patches/${patch} 2> /dev/null
+		git add debian/patches/${patch}
+	    done
+
+	    # Needs to be ported, so in the mean time disable them.
+	    for patch in PR1867 PR2668 PR3559 PR3560 PR3884; do 
+		cat debian/patches/series | grep -v "${patch}"  > x
+		mv x debian/patches/series
+		git add debian/patches/series
+	    done
+
+	    # Update the packaging
+	    curl http://bayour.com/misc/build-deps.patch | \
+		patch -p1
+	    git add debian/control.in
+	fi
+
+	# 3. Commit changes.
+	msg="Start out with ${APP}/master then get debian dir from "
+	msg="${msg} pkg-${APP}/master/debian/${DIST} (w/ updated patches)"
+	git commit -m "$msg"
     else
 	git checkout ${BRANCH}/debian/${DIST}
     fi
@@ -74,12 +110,16 @@ fi
 
 # 2. Get the latest upstream tag.
 #    If there's no changes, exit successfully here.
-git merge -Xtheirs --no-edit ${branch} 2>&1 | \
-    grep -q "^Already up-to-date.$" && \
-    no_change=1
-if [ "${no_change}" = "1" -a "${DIST}" != "sid" ]; then
+if [ "${BRANCH}" != "snapshot" ]; then
+    # TODO: !! Temporary solution !!
+    # No need to do this, we're already using the master branch.
+    git merge -Xtheirs --no-edit ${branch} 2>&1 | \
+	grep -q "^Already up-to-date.$" && \
+	no_change=1
+    if [ "${no_change}" = "1" -a "${DIST}" != "sid" ]; then
         echo "=> No point in building - same as previous version."
-    exit 0
+	exit 0
+    fi
 fi
 
 # Get the version
@@ -163,7 +203,10 @@ echo "=> Upload packages"
 dupload ${WORKSPACE}/*.changes
 
 # Push our changes to GitHub
-[ "${BRANCH}" = "snapshot" ] && force="--force"
+if [ "${BRANCH}" = "snapshot" ]; then
+    # TODO: !! Temporary solution !!
+    force="--force"
+fi
 # TODO: !! NOT YET !!
 #git push --all ${force}
 
