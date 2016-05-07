@@ -53,11 +53,11 @@ elif [ -n "${1}" -a -n "${2}" -a -n "${3}" ]; then
 fi
 
 if [ -z "${APP}" -o -z "${DIST}" -o -z "${BRANCH}" -o -z "${GITNAME}" \
-	-o -z "${GITEMAIL}" -o -z "${GPGKEY}" -o -z "${GPGPASS}" \
+	-o -z "${GITEMAIL}" -o -z "${GPGCACHEID}" -o -z "${GPGPASS}" \
 	-o -z "${GPGKEYID}" ]
 then
     echo -n "ERROR: One (or more) of APP, DIST, BRANCH, GITNAME, GITEMAIL, "
-    echo "GPGKEY and/or GPGPASS environment variable is missing!"
+    echo "GPGCACHEID and/or GPGPASS environment variable is missing!"
     echo "Usage: $(basename "${0}") <app> <dist> <branch>"
     exit 1
 fi
@@ -81,7 +81,7 @@ fi
 echo "=> Start and prime gnupg"
 eval $(gpg-agent --daemon --allow-preset-passphrase \
 		 --write-env-file "${WORKSPACE}/.gpg-agent.info")
-echo "${GPGPASS}" | /usr/lib/gnupg2/gpg-preset-passphrase  -v -c ${GPGKEY}
+echo "${GPGPASS}" | /usr/lib/gnupg2/gpg-preset-passphrase -v -c ${GPGCACHEID}
 
 # Copy built script.
 echo "=> Copying build script"
