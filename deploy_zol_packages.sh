@@ -25,7 +25,7 @@ if ! gpg-connect-agent /bye 2> /dev/null; then
 	eval $(gpg-agent --daemon --allow-preset-passphrase \
 		--write-env-file "${HOME}/.gpg-agent.info")
 fi
-echo "${GPGPASS}" | /usr/lib/gnupg2/gpg-preset-passphrase  -v -c ${GPGKEY}
+echo "${GPGPASS}" | /usr/lib/gnupg2/gpg-preset-passphrase  -v -c ${GPGCACHEID}
 
 # Go to the S3 repository 'checkout' and use reprepro to add the changes
 # to the repo.
