@@ -66,16 +66,14 @@ fi
 # This can be randomized if it's not supplied. This so that we
 # can run this from the shell if we want to.
 [ -z "${WORKSPACE}" ] && WORKSPACE="/tmp/docker_build-${APP}_$$"
+[ -d "${WORKSPACE}" ] || mkdir -p "${WORKSPACE}"
 
 echo "=> Setting up a Docker build (${APP}/${DIST}/${BRANCH})"
 
-if [ -n "${TERM}" ] || echo "$*" | grep -q bash; then
+if echo "$*" | grep -q bash; then
     # Should be interactive...
-# When we want to run interactivly, remove this comment and change
-# the docker script at the bottom to 'bash'.    
-    IT="-it"
-    mkdir -p "${WORKSPACE}" "${HOME}/docker_scratch"
-    script="bash"
+    IT="-it" # Run Docker container interactivly
+    script="bash" # Shell to spawn in Docker container
 else
     script="./build_zol.sh ${APP} ${DIST} ${BRANCH}"
 fi
@@ -90,18 +88,19 @@ echo "${GPGPASS}" | /usr/lib/gnupg2/gpg-preset-passphrase -v -c ${GPGCACHEID}
 # Copy built script.
 echo "=> Copying build script"
 cp "${BUILD_SCRIPT}" ${WORKSPACE}
+[ -d "${HOME}/docker_scratch" ] || mkdir -p "${HOME}/docker_scratch"
 
 # Start a docker container.
 # Inside there is where the actual build takes place, using the
 # 'build_zol.zh' script.
 echo "=> Starting docker image debian:${DIST}-devel"
 docker -H tcp://127.0.0.1:2375 run \
-       -v ${HOME}/.ssh:/root/.ssh \
        -v ${HOME}/.gnupg:/root/.gnupg \
        -v $(dirname ${SSH_AUTH_SOCK}):$(dirname ${SSH_AUTH_SOCK}) \
        -v $(dirname ${GPG_AGENT_INFO}):$(dirname ${GPG_AGENT_INFO}) \
-       -v ${WORKSPACE}:${WORKSPACE} -w ${WORKSPACE} \
+       -v ${WORKSPACE}:${WORKSPACE} \
        -v ${HOME}/docker_scratch:/tmp/docker_scratch \
+       -w ${WORKSPACE} \
        -e APP="${APP}" -e DIST="${DIST}" -e BRANCH="${BRANCH}" \
        -e LOGNAME="${LOGNAME}" -e SSH_AUTH_SOCK="${SSH_AUTH_SOCK}" \
        -e GPG_AGENT_INFO="${GPG_AGENT_INFO}" -e WORKSPACE="${WORKSPACE}" \
