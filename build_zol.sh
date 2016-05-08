@@ -55,24 +55,11 @@ git config --global user.email "${GITEMAIL}"
 
 # 1. Checkout the correct branch.
 if ! git show pkg-${APP}/${BRANCH}/debian/${DIST} > /dev/null 2>&1; then
-    # Branch don't exist - use 'jessie/master', because that's currently
-    # the latest.
+    # Branch don't exist (probably 'sid') - use the 'jessie' branch, because
+    # that's currently the latest.
     # If the system is very different from this, the build will probably
     # fail, but it's a start.
-    git checkout -b ${BRANCH}/debian/sid pkg-${APP}/master/debian/jessie
-elif [ "${BRANCH}" = "snapshot" -a "${APP}" = "zfs" ]; then
-    # TODO: !! Temporary solution !!
-    # NOTE: The spl branches have been cought up, so only do this for zfs
-    
-    if [ "${DIST}" = "wheezy" ]; then
-	# NOTE: snapshot/debian/wheezy is now up-to-date, so use that.
-	git checkout ${BRANCH}/debian/${DIST}
-    else
-	# a. Checkout snapshot/debian/wheezy into a new branch
-	#    NOTE: This will need to be force pushed at the end.
-	git checkout -b ${BRANCH}/debian/${DIST} \
-	    pkg-${APP}/snapshot/debian/wheezy
-    fi
+    git checkout -b ${BRANCH}/debian/sid pkg-${APP}/${BRANCH}/debian/jessie
 else
     # Not a snapshot - get the correct branch.
     git checkout ${BRANCH}/debian/${DIST}
@@ -98,17 +85,13 @@ then
 fi
 
 # 4. Get the latest upstream tag.
-#    The 'snapshot's are already latest, becasue we used that branch in the
-#    checkout, so don't do this for snapshots.
-if [ "${BRANCH}" != "snapshot" ]; then
-    #    If there's no changes, exit successfully here.
-    git merge -Xtheirs --no-edit ${branch} 2>&1 | \
-	grep -q "^Already up-to-date.$" && \
-	no_change=1
-    if [ "${no_change}" = "1" -a "${DIST}" != "sid" ]; then
-	echo "=> No point in building - same as previous version."
-	exit 0
-    fi
+#    If there's no changes, exit successfully here.
+git merge -Xtheirs --no-edit ${branch} 2>&1 | \
+    grep -q "^Already up-to-date.$" && \
+    no_change=1
+if [ "${no_change}" = "1" -a "${DIST}" != "sid" ]; then
+    echo "=> No point in building - same as previous version."
+    exit 0
 fi
 
 # 5. Get the version
@@ -196,8 +179,7 @@ echo "=> Upload packages"
 dupload ${WORKSPACE}/*.changes
 
 # Push our changes to GitHub
-# TODO: !! NOT YET !!
-#git push --all
+git push --all
 
 # Record changes
 echo "=> Recording successful build (${sha})"
