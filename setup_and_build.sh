@@ -69,12 +69,15 @@ fi
 
 echo "=> Setting up a Docker build (${APP}/${DIST}/${BRANCH})"
 
-if [ -n "${TERM}" ]; then
+if [ -n "${TERM}" ] || echo "$*" | grep -q bash; then
     # Should be interactive...
 # When we want to run interactivly, remove this comment and change
 # the docker script at the bottom to 'bash'.    
-#    IT="-it"
+    IT="-it"
     mkdir -p "${WORKSPACE}"
+    script="bash"
+else
+    script="./build_zol.sh ${APP} ${DIST} ${BRANCH}"
 fi
 
 # Start a GNUPG Agent and prime the passphrase so that signing of the
@@ -102,8 +105,7 @@ docker -H tcp://127.0.0.1:2375 run \
        -e LOGNAME="${LOGNAME}" -e SSH_AUTH_SOCK="${SSH_AUTH_SOCK}" \
        -e GPG_AGENT_INFO="${GPG_AGENT_INFO}" -e WORKSPACE="${WORKSPACE}" \
        -e GITNAME="${GITNAME}" -e GITEMAIL="${GITEMAIL}" \
-       -e GPGKEYID="${GPGKEYID}" --rm ${IT} debian:${DIST}-devel \
-       ./build_zol.sh ${APP} ${DIST} ${BRANCH}
+       -e GPGKEYID="${GPGKEYID}" --rm ${IT} debian:${DIST}-devel ${script}
 
 # Kill the GPG Agent
 echo "${GPG_AGENT_INFO}" | sed "s,.*:\(.*\):.*,\1," | \
