@@ -74,7 +74,7 @@ if [ -n "${TERM}" ] || echo "$*" | grep -q bash; then
 # When we want to run interactivly, remove this comment and change
 # the docker script at the bottom to 'bash'.    
     IT="-it"
-    mkdir -p "${WORKSPACE}"
+    mkdir -p "${WORKSPACE}" "${HOME}/docker_scratch"
     script="bash"
 else
     script="./build_zol.sh ${APP} ${DIST} ${BRANCH}"
@@ -101,6 +101,7 @@ docker -H tcp://127.0.0.1:2375 run \
        -v $(dirname ${SSH_AUTH_SOCK}):$(dirname ${SSH_AUTH_SOCK}) \
        -v $(dirname ${GPG_AGENT_INFO}):$(dirname ${GPG_AGENT_INFO}) \
        -v ${WORKSPACE}:${WORKSPACE} -w ${WORKSPACE} \
+       -v ${HOME}/docker_scratch:/tmp/docker_scratch \
        -e APP="${APP}" -e DIST="${DIST}" -e BRANCH="${BRANCH}" \
        -e LOGNAME="${LOGNAME}" -e SSH_AUTH_SOCK="${SSH_AUTH_SOCK}" \
        -e GPG_AGENT_INFO="${GPG_AGENT_INFO}" -e WORKSPACE="${WORKSPACE}" \
