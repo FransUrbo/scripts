@@ -1,13 +1,17 @@
 #!/bin/sh
 
-# For debugging
-#GIT_APP_REPO="git@github.com:zfsonlinux/pkg-${APP}.git"
+# Path to repository with packaging.
 GIT_APP_REPO="git@github.com:fransurbo/pkg-${APP}.git"
 
 # No checking for correct, missing or faulty values will be done in this
-# script. This is the second part of a automated build process and is intended
-# to run inside a Docker container. See comments in 'setup_and_build.sh' for
-# more information.
+# script. This is the second part of a automated build process and is
+# intended to run inside a Docker container. See comments in
+# 'setup_and_build.sh' for more information.
+#
+# The use of 'master' and 'snapshot' (the two options) doesn't refer to the
+# master branch, but the base of the pkg-{spl,zfs} branch trees in the
+# pkg-{spl,zfs} repositories. The 'master' tree is the released versions
+# and 'snapshot' are the dailies.
 #
 # Copyright 2016 Turbo Fredriksson <turbo@bayour.com>.
 # Released under GPL, version of your choosing.
@@ -17,6 +21,17 @@ set -e
 
 echo "=> Building (${APP}/${DIST}/${BRANCH})"
 
+# If we haven't mounted the $HOME/.ssh directory into the Docker container,
+# the known_hosts don't exit. However, if we have a local copy (in the
+# scratch dir), then use that.
+# To avoid a 'Do you really want to connect' question, make sure that the
+# hosts we're using is all in there.
+if [ ! -f "/root/.ssh/known_hosts" -a "/tmp/docker_scratch/known_hosts" ]
+then
+    # We probably don't have the .ssh directory either, so create it.
+    [ -d "/root/.ssh" ] || mkdir -p /root/.ssh
+    cp /tmp/docker_scratch/known_hosts /root/.ssh/known_hosts
+fi
 
 # --------------------------------
 # --> C O D E  C H E C K O U T <--
@@ -42,100 +57,77 @@ git config --global user.email "${GITEMAIL}"
 if ! git show pkg-${APP}/${BRANCH}/debian/${DIST} > /dev/null 2>&1; then
     # Branch don't exist - use 'jessie/master', because that's currently
     # the latest.
+    # If the system is very different from this, the build will probably
+    # fail, but it's a start.
     git checkout -b ${BRANCH}/debian/sid pkg-${APP}/master/debian/jessie
-else
-    if [ "${BRANCH}" = "snapshot" ]; then
-	# TODO: !! Temporary solution !!
-	# Because snapshot is very behind my released versions, use the
-	# 'master' branch instead.
-
-	# 1. Checkout master repository into a new snapshot branch
-	#    NOTE: This will need to be force pushed at the end.
-	git checkout -b ${BRANCH}/debian/${DIST} ${APP}/master
-
-	# 2. Get the debian directory from the master branch.
-	git checkout pkg-${APP}/master/debian/${DIST} -- debian
-
-	if [ "${APP}" = "xxx" ]; then
-	    # TODO: The ZFS patches needs to be updated
-	    # 3. Update debian patches.
-	    for patch in 0002-Prevent-manual-builds-in-the-DKMS-source.patch \
-			     PR1099.patch PR1476.patch PR3465.patch \
-			     libzfs-dependencies
-	    do
-		curl http://bayour.com/misc/${patch} \
-		     > debian/patches/${patch} 2> /dev/null
-		git add debian/patches/${patch}
-	    done
-
-	    # Needs to be ported, so in the mean time disable them.
-	    for patch in PR1867 PR2668 PR3559 PR3560 PR3884; do 
-		cat debian/patches/series | grep -v "${patch}"  > x
-		mv x debian/patches/series
-		git add debian/patches/series
-	    done
-
-	    # Update the packaging
-	    curl http://bayour.com/misc/build-deps.patch | \
-		patch -p1
-	    git add debian/control.in
-	fi
-
-	# 3. Commit changes.
-	msg="Start out with ${APP}/master then get debian dir from "
-	msg="${msg} pkg-${APP}/master/debian/${DIST} (w/ updated patches)"
-	git commit -m "$msg"
-    else
+elif [ "${BRANCH}" = "snapshot" -a "${APP}" = "zfs" ]; then
+    # TODO: !! Temporary solution !!
+    # NOTE: The spl branches have been cought up, so only do this for zfs
+    
+    if [ "${DIST}" = "wheezy" ]; then
+	# NOTE: snapshot/debian/wheezy is now up-to-date, so use that.
 	git checkout ${BRANCH}/debian/${DIST}
+    else
+	# a. Checkout snapshot/debian/wheezy into a new branch
+	#    NOTE: This will need to be force pushed at the end.
+	git checkout -b ${BRANCH}/debian/${DIST} \
+	    pkg-${APP}/snapshot/debian/wheezy
     fi
+else
+    # Not a snapshot - get the correct branch.
+    git checkout ${BRANCH}/debian/${DIST}
 fi
 
-# Check which branch to use for version check
+# 2. Check which branch to use for version check and to get 'latest' from.
 if [ "${BRANCH}" = "snapshot" ]; then
     branch="${APP}/master"
 else
     branch="$(git tag -l ${APP}-[0-9]* | tail -n1)"
 fi
 
-# Make sure that the code in the branch have changed.
+# 3. Make sure that the code in the branch have changed.
 sha="$(git log --pretty=oneline --abbrev-commit ${branch} | \
     head -n1 | sed 's@ .*@@')"
-if [ -f "${WORKSPACE}/../lastSuccessfulSha-${APP}-${DIST}-${BRANCH}" ]; then
-    old="$(cat "${WORKSPACE}/../lastSuccessfulSha-${APP}-${DIST}-${BRANCH}")"
+if [ -f "/tmp/docker_scratch/lastSuccessfulSha-${APP}-${DIST}-${BRANCH}" ]
+then
+    old="$(cat "/tmp/docker_scratch/lastSuccessfulSha-${APP}-${DIST}-${BRANCH}")"
     if [ "${sha}" = "${old}" ]; then
         echo "=> No point in building - same as previous version."
         exit 0
     fi
 fi
 
-# 2. Get the latest upstream tag.
-#    If there's no changes, exit successfully here.
+# 4. Get the latest upstream tag.
+#    The 'snapshot's are already latest, becasue we used that branch in the
+#    checkout, so don't do this for snapshots.
 if [ "${BRANCH}" != "snapshot" ]; then
-    # TODO: !! Temporary solution !!
-    # No need to do this, we're already using the master branch.
+    #    If there's no changes, exit successfully here.
     git merge -Xtheirs --no-edit ${branch} 2>&1 | \
 	grep -q "^Already up-to-date.$" && \
 	no_change=1
     if [ "${no_change}" = "1" -a "${DIST}" != "sid" ]; then
-        echo "=> No point in building - same as previous version."
+	echo "=> No point in building - same as previous version."
 	exit 0
     fi
 fi
 
-# Get the version
+# 5. Get the version
 pkg_version="$(git describe ${branch} | sed "s@^${APP}-@@")-1-${DIST}"
-[ "${BRANCH}" = "snapshot" ] && pkg_version="${pkg_version}-daily"
+if [ "${BRANCH}" = "snapshot" ]; then
+    pkg_version="$(echo "${pkg_version}" | \
+	sed "s@\([0-9]\.[0-9]\.[0-9]\)-\(.*\)@\1.999-\2@")-daily"
+fi
 
 # ----------------------------------
 # --> P A C K A G E  U P D A T E <--
 # ----------------------------------
 
-# Update the GBP config file
+# 6. Update the GBP config file
 sed -i -e "s,^\(debian-branch\)=.*,\1=${BRANCH}/debian/${DIST}," \
        -e "s,^\(debian-tag\)=.*\(/\%.*\),\1=${BRANCH}/debian/${DIST}\2," \
        -e "s,^\(upstream-.*\)=.*,\1=${branch},"  debian/gbp.conf
 
-# Update and commit
+# 7. Update and commit
 echo "=> Update and commit the changelog"
 if [ "${BRANCH}" = "snapshot" ]; then
     dist="${DIST}-daily"
@@ -145,12 +137,13 @@ if [ "${BRANCH}" = "snapshot" ]; then
     #   E: spl-linux changes: bad-distribution-in-changes-file sid-daily
     # Don't know why I don't get that for '{wheezy,jessie}-daily as well,
     # but we do this for all of them, just to make sure.
-    mkdir -p /usr/share/lintian/vendors/debian/main/data/changes-file
-    if [ ! -f "/usr/share/lintian/vendors/debian/main/data/changes-file/known-dists" ]
+    CHANGES_DIR="/usr/share/lintian/vendors/debian/main/data/changes-file"
+    mkdir -p "${CHANGES_DIR}"
+    if [ ! -f "${CHANGES_DIR}/known-dists" ]
     then
-	echo "${dist}" >  /usr/share/lintian/vendors/debian/main/data/changes-file/known-dists
+	echo "${dist}" >  "${CHANGES_DIR}/known-dists"
     else
-	echo "${dist}" >> /usr/share/lintian/vendors/debian/main/data/changes-file/known-dists
+	echo "${dist}" >> "${CHANGES_DIR}/known-dists"
     fi
 else
     dist="${DIST}"
@@ -203,13 +196,9 @@ echo "=> Upload packages"
 dupload ${WORKSPACE}/*.changes
 
 # Push our changes to GitHub
-if [ "${BRANCH}" = "snapshot" ]; then
-    # TODO: !! Temporary solution !!
-    force="--force"
-fi
 # TODO: !! NOT YET !!
-#git push --all ${force}
+#git push --all
 
 # Record changes
 echo "=> Recording successful build (${sha})"
-echo "${sha}" > "${WORKSPACE%%/workspace*}/lastSuccessfulSha-${DIST}-${APP}"
+echo "${sha}" > "/tmp/docker_scratch/lastSuccessfulSha-${APP}-${DIST}-${BRANCH}"
