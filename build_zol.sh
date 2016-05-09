@@ -152,6 +152,7 @@ deps="$(dpkg-checkbuilddeps 2>&1 | \
     sed -e 's,.*dependencies: ,,' -e 's, (.*,,')"
 while [ -n "${deps}" ]; do
     echo "=> Installing package dependencies"
+    apt-get update > /dev/null 2>&1
     apt-get install -y ${deps} > /dev/null 2>&1
     if [ "$?" = "0" ]; then
 	deps="$(dpkg-checkbuilddeps 2>&1 | \
