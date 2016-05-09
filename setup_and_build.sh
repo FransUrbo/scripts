@@ -100,7 +100,7 @@ docker -H tcp://127.0.0.1:2375 run \
        -v $(dirname ${GPG_AGENT_INFO}):$(dirname ${GPG_AGENT_INFO}) \
        -v ${WORKSPACE}:${WORKSPACE} \
        -v ${HOME}/docker_scratch:/tmp/docker_scratch \
-       -w ${WORKSPACE} \
+       -w ${WORKSPACE} -e FORCE="${FORCE}" \
        -e APP="${APP}" -e DIST="${DIST}" -e BRANCH="${BRANCH}" \
        -e LOGNAME="${LOGNAME}" -e SSH_AUTH_SOCK="${SSH_AUTH_SOCK}" \
        -e GPG_AGENT_INFO="${GPG_AGENT_INFO}" -e WORKSPACE="${WORKSPACE}" \

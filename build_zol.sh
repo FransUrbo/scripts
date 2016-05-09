@@ -75,7 +75,8 @@ fi
 # 3. Make sure that the code in the branch have changed.
 sha="$(git log --pretty=oneline --abbrev-commit ${branch} | \
     head -n1 | sed 's@ .*@@')"
-if [ -f "/tmp/docker_scratch/lastSuccessfulSha-${APP}-${DIST}-${BRANCH}" ]
+if [ -n "${FORCE}" -a \
+     -f "/tmp/docker_scratch/lastSuccessfulSha-${APP}-${DIST}-${BRANCH}" ]
 then
     old="$(cat "/tmp/docker_scratch/lastSuccessfulSha-${APP}-${DIST}-${BRANCH}")"
     if [ "${sha}" = "${old}" ]; then
