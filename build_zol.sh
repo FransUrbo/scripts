@@ -96,23 +96,32 @@ if [ -z "${FORCE}" -a "${no_change}" = "1" -a "${DIST}" != "sid" ]; then
     exit 0
 fi
 
-# 5. Get the version
-pkg_version="$(git describe ${branch} | sed "s@^${APP}-@@")-1-${DIST}"
+# 5. Calculate the next version.
+nr="$(head -n1 debian/changelog | sed -e "s@.*(\(.*\)).*@\1@" \
+    -e "s@^\(.*\)-\([0-9]\+\)-\(.*\)\$@\2@" -e "s@^\(.*\)-\([0-9]\+\)\$@\2@")"
+pkg_version="$(git describe ${branch} | sed "s@^${APP}-@@")"
 if [ "${BRANCH}" = "snapshot" ]; then
+    pkg_version="${pkg_version}-$(expr ${nr} + 1)-${DIST}"
     pkg_version="$(echo "${pkg_version}" | \
 	sed "s@\([0-9]\.[0-9]\.[0-9]\)-\(.*\)@\1.999-\2@")-daily"
+else
+    pkg_version="${pkg_version}-$(expr ${nr} + 1)-${DIST}"
 fi
 
 # ----------------------------------
 # --> P A C K A G E  U P D A T E <--
 # ----------------------------------
 
-# 6. Update the GBP config file
+# 6. Setup debian directory.
+echo "=> Start with a clean debian/controls file"
+debian/rules override_dh_prep-base-deb-files
+
+# 7. Update the GBP config file
 sed -i -e "s,^\(debian-branch\)=.*,\1=${BRANCH}/debian/${DIST}," \
        -e "s,^\(debian-tag\)=.*\(/\%.*\),\1=${BRANCH}/debian/${DIST}\2," \
        -e "s,^\(upstream-.*\)=.*,\1=${branch},"  debian/gbp.conf
 
-# 7. Update and commit
+# 8. Update and commit
 echo "=> Update and commit the changelog"
 if [ "${BRANCH}" = "snapshot" ]; then
     dist="${DIST}-daily"
@@ -144,10 +153,6 @@ git commit -m "New daily release - $(date -R)/${sha}."
 # -----------------------------------
 # --> S T A R T  T H E  B U I L D <--
 # -----------------------------------
-
-# Setup debian directory.
-echo "=> Start with a clean debian/controls file"
-debian/rules override_dh_prep-base-deb-files
 
 # Install dependencies
 deps="$(dpkg-checkbuilddeps 2>&1 | \
