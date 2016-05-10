@@ -5,6 +5,9 @@
 S3_REPO_DIR="/home/ftp/zol/debian"
 INCOMING_DIR="/usr/src/incoming.jenkins"
 
+# Delete old files in the repo.
+#DELETE="--delete-removed --delete-after"
+
 # No checking for correct, missing or faulty values will be done in this
 # script. This is the third part of a automated build process and is intended
 # to run inside a Docker container. See comments in 'setup_and_build.sh' for
@@ -37,6 +40,27 @@ while read changes; do
 
 echo	reprepro include "${dist}" "${changes}"
 done
+
+# Cleanup/fixup the repo.
+# * S3 can't handle files with a '+' in them, so replace it with a space.
+find -name '*+*' | \
+	while read file; do
+		new=`echo "$file" | sed 's@\+@ @g'`
+		if [ ! -e "$new" ]; then
+			echo -n "Creating '+' link for '$file': "
+			pushd "$(dirname "$new")" > /dev/null 2>&1
+			if file "$(basename "$file")" | grep -q ': directory'; then
+				cp -r "$(basename "$file")" "$(basename "$new")"
+			else
+				ln "$(basename "$file")" "$(basename "$new")"
+			fi
+			popd > /dev/null 2>&1
+			echo "done."
+		fi
+	done
+
+# Syncronize the repository
+#s3cmd sync $DELETE --acl-public ./ s3://archive.zfsonlinux.org/debian/
 
 # Kill the GPG Agent
 echo "${GPG_AGENT_INFO}" | sed "s,.*:\(.*\):.*,\1," | \
