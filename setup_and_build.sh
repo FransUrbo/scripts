@@ -5,7 +5,7 @@ set -e
 
 # Path to the actual build script. This should be the only manual change
 # needed.
-BUILD_SCRIPT="${HOME}/bin/build_zol.sh"
+BUILD_SCRIPT="/tmp/docker_scratch/build_zol.sh"
 
 # ========================================================================
 # This is the primary build script (of two) intended to build ZFS On Linux
@@ -75,7 +75,7 @@ if echo "$*" | grep -q bash; then
     IT="-it" # Run Docker container interactivly
     script="bash" # Shell to spawn in Docker container
 else
-    script="./build_zol.sh ${APP} ${DIST} ${BRANCH}"
+    script="${BUILD_SCRIPT} ${APP} ${DIST} ${BRANCH}"
 fi
 
 # Start a GNUPG Agent and prime the passphrase so that signing of the
@@ -84,11 +84,6 @@ echo "=> Start and prime gnupg"
 eval $(gpg-agent --daemon --allow-preset-passphrase \
 		 --write-env-file "${WORKSPACE}/.gpg-agent.info")
 echo "${GPGPASS}" | /usr/lib/gnupg2/gpg-preset-passphrase -v -c ${GPGCACHEID}
-
-# Copy built script.
-echo "=> Copying build script"
-cp "${BUILD_SCRIPT}" ${WORKSPACE}
-[ -d "${HOME}/docker_scratch" ] || mkdir -p "${HOME}/docker_scratch"
 
 # Start a docker container.
 # Inside there is where the actual build takes place, using the
