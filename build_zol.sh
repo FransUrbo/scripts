@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Path to repository with packaging.
-GIT_APP_REPO="git@github.com:fransurbo/pkg-${APP}.git"
+GIT_APP_REPO="git@github.com:zfsonlinux/pkg-${APP}.git"
 
 # No checking for correct, missing or faulty values will be done in this
 # script. This is the second part of a automated build process and is
