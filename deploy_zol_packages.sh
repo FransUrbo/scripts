@@ -53,8 +53,22 @@ while read changes; do
 	# Get the distribution from the changes file.
 	dist="$(grep "^Distribution:" "${changes}" | sed 's@.*: @@')"
 
-echo	reprepro include "${dist}" "${changes}"
-	[ "$?" ] && touch "${done}"
+	if [ "${dist}" = "zfsonlinux" ]; then
+	    # This is probably the 'zfsonlinux' meta package. Install it
+	    # everywhere.
+	    for dist in $(grep '^Codename:' conf/distributions | \
+		egrep -v 'daily|installer' | sed 's@.*: @@')
+	    do
+		for subdist in "" -daily; do
+		    reprepro --ignore=surprisingbinary \
+			    --ignore=wrongdistribution include \
+			    ${dist}${subdist} "${changes}"
+		done
+	    done
+	else
+	    reprepro --ignore=surprisingbinary include "${dist}" "${changes}"
+	    [ "$?" ] && touch "${done}"
+	fi
     fi
 done
 
