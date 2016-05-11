@@ -21,6 +21,11 @@ INCOMING_DIR="/usr/src/incoming.jenkins"
 
 set -e
 
+
+# -----------------------------------------
+# --> S T A R T   G N U P G   A G E N T <--
+# -----------------------------------------
+
 # Start a GNUPG Agent and prime the passphrase so that signing of the
 # packages etc work without intervention.
 echo "=> Start and prime gnupg"
@@ -30,34 +35,56 @@ if ! gpg-connect-agent /bye 2> /dev/null; then
 fi
 echo "${GPGPASS}" | /usr/lib/gnupg2/gpg-preset-passphrase  -v -c ${GPGCACHEID}
 
-# Go to the S3 repository 'checkout' and use reprepro to add the changes
-# to the repo.
+
+# -----------------------------
+# --> U P D A T E   R E P O <--
+# -----------------------------
+
 cd "${S3_REPO_DIR}"
+
+# Update dists links.
+reprepro --delete createsymlinks
+
+# Use reprepro to add the changes to the repo.
 find "${INCOMING_DIR}" -type f -name "*.changes" 2> /dev/null | sort | \
 while read changes; do
+    done="$(echo "${changes}" | sed 's@\.changes@\.done@')"
+    if [ ! -f "${done}" ]; then
 	# Get the distribution from the changes file.
-	dist="$(grep "^Distribution:" "$changes" | sed 's@.*: @@')"
+	dist="$(grep "^Distribution:" "${changes}" | sed 's@.*: @@')"
 
 echo	reprepro include "${dist}" "${changes}"
+	[ "$?" ] && touch "${done}"
+    fi
 done
+
+
+# -----------------------
+# --> F I X   R E P O <--
+# -----------------------
 
 # Cleanup/fixup the repo.
 # * S3 can't handle files with a '+' in them, so replace it with a space.
 find -name '*+*' | \
-	while read file; do
-		new=`echo "$file" | sed 's@\+@ @g'`
-		if [ ! -e "$new" ]; then
-			echo -n "Creating '+' link for '$file': "
-			pushd "$(dirname "$new")" > /dev/null 2>&1
-			if file "$(basename "$file")" | grep -q ': directory'; then
-				cp -r "$(basename "$file")" "$(basename "$new")"
-			else
-				ln "$(basename "$file")" "$(basename "$new")"
-			fi
-			popd > /dev/null 2>&1
-			echo "done."
-		fi
-	done
+while read file; do
+    new=`echo "$file" | sed 's@\+@ @g'`
+    if [ ! -e "$new" ]; then
+	echo -n "Creating '+' link for '$file': "
+	pushd "$(dirname "$new")" > /dev/null 2>&1
+	if file "$(basename "$file")" | grep -q ': directory'; then
+	    cp -r "$(basename "$file")" "$(basename "$new")"
+	else
+	    ln "$(basename "$file")" "$(basename "$new")"
+	fi
+	popd > /dev/null 2>&1
+	echo "done."
+    fi
+done
+
+
+# -------------------------
+# --> S Y N C   R E P O <--
+# -------------------------
 
 # Syncronize the repository
 #s3cmd sync $DELETE --acl-public ./ s3://archive.zfsonlinux.org/debian/
