@@ -103,9 +103,8 @@ nr="$(head -n1 debian/changelog | sed -e "s@.*(\(.*\)).*@\1@" \
     -e "s@^\(.*\)-\([0-9]\+\)-\(.*\)\$@\2@" -e "s@^\(.*\)-\([0-9]\+\)\$@\2@")"
 pkg_version="$(git describe ${branch} | sed "s@^${APP}-@@")"
 if [ "${BRANCH}" = "snapshot" ]; then
-    pkg_version="${pkg_version}-$(expr ${nr} + 1)-${DIST}"
     pkg_version="$(echo "${pkg_version}" | \
-	sed "s@\([0-9]\.[0-9]\.[0-9]\)-\(.*\)@\1.999-\2@")-daily"
+	sed "s@\([0-9]\.[0-9]\.[0-9]\)-\(.*\)@\1.999-\2@")-${DIST}-daily"
 else
     pkg_version="${pkg_version}-$(expr ${nr} + 1)-${DIST}"
 fi
