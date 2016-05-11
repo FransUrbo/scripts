@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Paths to the repo and incoming directory. This should be the only manual
 # change needed.
@@ -9,7 +9,7 @@ INCOMING_DIR="/usr/src/incoming.jenkins"
 #DELETE="--delete-removed --delete-after"
 
 # Default reprepro options.
-REPREPRO="reprepro --ignore=surprisingbinary --export=never --silent"
+REPREPRO="reprepro --ignore=surprisingbinary --export=never"
 
 # No checking for correct, missing or faulty values will be done in this
 # script. This is the third part of a automated build process and is intended
@@ -30,7 +30,7 @@ stop_gpg_agent() {
     echo "${GPG_AGENT_INFO}" | sed "s,.*:\(.*\):.*,\1," | \
 	xargs --no-run-if-empty kill
 }
-trap stop_gpg_agent EXIT
+trap stop_gpg_agent EXIT SIGABRT
 
 # -----------------------------------------
 # --> S T A R T   G N U P G   A G E N T <--
@@ -53,16 +53,13 @@ cd "${S3_REPO_DIR}"
 # -------------------------
 
 # Syncronize the repository
-s3cmd sync $DELETE s3://archive.zfsonlinux.org/debian/ ./
+db="db/"
+s3cmd sync $DELETE s3://archive.zfsonlinux.org/debian/${db} ./${db}
 
 
 # -----------------------------
 # --> U P D A T E   R E P O <--
 # -----------------------------
-
-# Update dists links.
-echo "=> Update dists links"
-reprepro --delete createsymlinks
 
 # Use reprepro to add the changes to the repo.
 find "${INCOMING_DIR}" -type f -name "*.changes" 2> /dev/null | sort | \
@@ -80,14 +77,15 @@ while read changes; do
 		egrep -v 'daily|installer' | sed 's@.*: @@')
 	    do
 		for subdist in "" -daily; do
+		    echo "  => ${dist}${subdist} ${changes}"
 		    ${REPREPRO} --ignore=wrongdistribution include \
-			${dist}${subdist} "${changes}"
-		    [ "$?" ] && touch "${done}"
+			${dist}${subdist} "${changes}" > /dev/null 2>&1
+		    [ "$?" ] && touch "${done}" || echo "ERROR"
 		done
 	    done
 	else
-	    ${REPREPRO} include "${dist}" "${changes}"
-	    [ "$?" ] && touch "${done}"
+	    ${REPREPRO} include "${dist}" "${changes}" > /dev/null 2>&1
+	    [ "$?" ] && touch "${done}" || echo "ERROR"
 	fi
     fi
 done
