@@ -9,7 +9,7 @@ INCOMING_DIR="/usr/src/incoming.jenkins"
 #DELETE="--delete-removed --delete-after"
 
 # Default reprepro options.
-REPREPRO="reprepro --ignore=surprisingbinary --export=never"
+REPREPRO="reprepro --ignore=surprisingbinary --export=never --silent"
 
 # No checking for correct, missing or faulty values will be done in this
 # script. This is the third part of a automated build process and is intended
@@ -24,6 +24,13 @@ REPREPRO="reprepro --ignore=surprisingbinary --export=never"
 
 set -e
 
+# Kill the GPG Agent
+stop_gpg_agent() {
+    echo "=> Stop the GPG Agent"
+    echo "${GPG_AGENT_INFO}" | sed "s,.*:\(.*\):.*,\1," | \
+	xargs --no-run-if-empty kill
+}
+trap stop_gpg_agent EXIT
 
 # -----------------------------------------
 # --> S T A R T   G N U P G   A G E N T <--
@@ -46,7 +53,7 @@ cd "${S3_REPO_DIR}"
 # -------------------------
 
 # Syncronize the repository
-s3cmd sync --skip-existing $DELETE s3://archive.zfsonlinux.org/debian/ ./
+s3cmd sync $DELETE s3://archive.zfsonlinux.org/debian/ ./
 
 
 # -----------------------------
@@ -118,7 +125,3 @@ done
 
 # Syncronize the repository
 #s3cmd sync $DELETE --acl-public ./ s3://archive.zfsonlinux.org/debian/
-
-# Kill the GPG Agent
-echo "${GPG_AGENT_INFO}" | sed "s,.*:\(.*\):.*,\1," | \
-    xargs --no-run-if-empty kill
