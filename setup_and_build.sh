@@ -63,6 +63,13 @@ then
     exit 1
 fi
 
+stop_gpg_agent() {
+    # Kill the GPG Agent
+    echo "${GPG_AGENT_INFO}" | sed "s,.*:\(.*\):.*,\1," | \
+        xargs --no-run-if-empty kill
+}
+trap stop_gpg_agent EXIT
+
 # This can be randomized if it's not supplied. This so that we
 # can run this from the shell if we want to.
 [ -z "${WORKSPACE}" ] && WORKSPACE="/tmp/docker_build-${APP}_$$"
@@ -101,7 +108,3 @@ docker -H tcp://127.0.0.1:2375 run \
        -e GPG_AGENT_INFO="${GPG_AGENT_INFO}" -e WORKSPACE="${WORKSPACE}" \
        -e GITNAME="${GITNAME}" -e GITEMAIL="${GITEMAIL}" \
        -e GPGKEYID="${GPGKEYID}" --rm ${IT} debian:${DIST}-devel ${script}
-
-# Kill the GPG Agent
-echo "${GPG_AGENT_INFO}" | sed "s,.*:\(.*\):.*,\1," | \
-    xargs --no-run-if-empty kill
