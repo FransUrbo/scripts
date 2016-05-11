@@ -8,6 +8,9 @@ INCOMING_DIR="/usr/src/incoming.jenkins"
 # Delete old files in the repo.
 #DELETE="--delete-removed --delete-after"
 
+# Default reprepro options.
+REPREPRO="reprepro --ignore=surprisingbinary --export=never"
+
 # No checking for correct, missing or faulty values will be done in this
 # script. This is the third part of a automated build process and is intended
 # to run inside a Docker container. See comments in 'setup_and_build.sh' for
@@ -35,14 +38,23 @@ if ! gpg-connect-agent /bye 2> /dev/null; then
 fi
 echo "${GPGPASS}" | /usr/lib/gnupg2/gpg-preset-passphrase  -v -c ${GPGCACHEID}
 
+cd "${S3_REPO_DIR}"
+
+
+# -------------------------
+# --> S Y N C   R E P O <--
+# -------------------------
+
+# Syncronize the repository
+s3cmd sync --skip-existing $DELETE s3://archive.zfsonlinux.org/debian/ ./
+
 
 # -----------------------------
 # --> U P D A T E   R E P O <--
 # -----------------------------
 
-cd "${S3_REPO_DIR}"
-
 # Update dists links.
+echo "=> Update dists links"
 reprepro --delete createsymlinks
 
 # Use reprepro to add the changes to the repo.
@@ -52,6 +64,7 @@ while read changes; do
     if [ ! -f "${done}" ]; then
 	# Get the distribution from the changes file.
 	dist="$(grep "^Distribution:" "${changes}" | sed 's@.*: @@')"
+	echo "=> include ${dist} ${changes}"
 
 	if [ "${dist}" = "zfsonlinux" ]; then
 	    # This is probably the 'zfsonlinux' meta package. Install it
@@ -60,18 +73,21 @@ while read changes; do
 		egrep -v 'daily|installer' | sed 's@.*: @@')
 	    do
 		for subdist in "" -daily; do
-		    reprepro --ignore=surprisingbinary \
-			    --ignore=wrongdistribution include \
-			    ${dist}${subdist} "${changes}"
+		    ${REPREPRO} --ignore=wrongdistribution include \
+			${dist}${subdist} "${changes}"
+		    [ "$?" ] && touch "${done}"
 		done
 	    done
 	else
-	    reprepro --ignore=surprisingbinary include "${dist}" "${changes}"
+	    ${REPREPRO} include "${dist}" "${changes}"
 	    [ "$?" ] && touch "${done}"
 	fi
     fi
 done
 
+# Exporting indices.
+echo "=> Exporting indices"
+reprepro export
 
 # -----------------------
 # --> F I X   R E P O <--
