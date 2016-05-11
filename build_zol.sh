@@ -55,11 +55,10 @@ git config --global user.email "${GITEMAIL}"
 
 # 1. Checkout the correct branch.
 if ! git show pkg-${APP}/${BRANCH}/debian/${DIST} > /dev/null 2>&1; then
-    # Branch don't exist (probably 'sid') - use the 'jessie' branch, because
-    # that's currently the latest.
-    # If the system is very different from this, the build will probably
-    # fail, but it's a start.
-    git checkout -b ${BRANCH}/debian/sid pkg-${APP}/${BRANCH}/debian/jessie
+    # Branch don't exist - use the 'jessie' branch, because that's currently the latest.
+    # If the system is very different from this, the build will probably fail, but it's
+    # a start.
+    git checkout -b ${BRANCH}/debian/${DIST} pkg-${APP}/${BRANCH}/debian/jessie
 else
     # Not a snapshot - get the correct branch.
     git checkout ${BRANCH}/debian/${DIST}
@@ -75,7 +74,7 @@ fi
 # 3. Make sure that the code in the branch have changed.
 sha="$(git log --pretty=oneline --abbrev-commit ${branch} | \
     head -n1 | sed 's@ .*@@')"
-if [ -z "${FORCE}" -a \
+if [ "${FORCE}" = "true" -a \
      -f "/tmp/docker_scratch/lastSuccessfulSha-${APP}-${DIST}-${BRANCH}" ]
 then
     file="/tmp/docker_scratch/lastSuccessfulSha-${APP}-${DIST}-${BRANCH}"
@@ -88,15 +87,18 @@ fi
 
 # 4. Get the latest upstream tag.
 #    If there's no changes, exit successfully here.
+#    However, if we're called with FORCE set, then ignore this and continue anyway.
 git merge -Xtheirs --no-edit ${branch} 2>&1 | \
     grep -q "^Already up-to-date.$" && \
     no_change=1
-if [ -z "${FORCE}" -a "${no_change}" = "1" -a "${DIST}" != "sid" ]; then
+if [ "${FORCE}" = "true" -a "${no_change}" = "1" -a "${DIST}" != "sid" ]
+then
     echo "=> No point in building - same as previous version."
     exit 0
 fi
 
 # 5. Calculate the next version.
+#    Some ugly magic here.
 nr="$(head -n1 debian/changelog | sed -e "s@.*(\(.*\)).*@\1@" \
     -e "s@^\(.*\)-\([0-9]\+\)-\(.*\)\$@\2@" -e "s@^\(.*\)-\([0-9]\+\)\$@\2@")"
 pkg_version="$(git describe ${branch} | sed "s@^${APP}-@@")"
