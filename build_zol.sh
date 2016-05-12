@@ -132,7 +132,7 @@ if [ "${BRANCH}" = "snapshot" ]; then
     # Don't know why I don't get that for '{wheezy,jessie}-daily as well,
     # but we do this for all of them, just to make sure.
     CHANGES_DIR="/usr/share/lintian/vendors/debian/main/data/changes-file"
-    mkdir -p "${CHANGES_DIR}"
+    sudo mkdir -p "${CHANGES_DIR}"
     if [ ! -f "${CHANGES_DIR}/known-dists" ]
     then
 	echo "${dist}" >  "${CHANGES_DIR}/known-dists"
