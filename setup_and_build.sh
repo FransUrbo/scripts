@@ -33,10 +33,25 @@ BUILD_SCRIPT="/tmp/docker_scratch/build_zol.sh"
 #       GPGPASS		GPG Passphrase
 # If not running from Jenkins, set this in the environment normaly.
 #
+# The following optional values can be set:
+#   FORCE               Ignore existing build (true, false)
+#   NOUPLOAD            Don't run dupload on the changes (set, unset)
+#
 # The 'WORKSPACE' variable is set by Jenkins for every job and is the path
 # to the base build directory (where the GIT project is checked out and
 # build), but if it's not set, it will be set in the script to something
 # resonable.
+#
+# Inside the container, the user 'jenkins' is used, so the image(s) must
+# have that user with a writable homedirectory. In that homedirectory,
+# a 'build' directory must be created. The $WORKSPACE will be mounted
+# in ~jenkins/build/src and the artifacts (packages, changes etc) will
+# then be created in the ~jenkins/build directory. These will only be
+# accessible from inside the container - when the container terminates,
+# the artifacts will be lost.
+# The build script takes that into account by copying them into the
+# 'artifacts' directory (=> $WORKSPACE/artifacts) for archiving by
+# Jenkins.
 #
 # Copyright 2016 Turbo Fredriksson <turbo@bayour.com>.
 # Released under GPL, version of your choosing.
@@ -101,7 +116,7 @@ docker -H tcp://127.0.0.1:2375 run -u jenkins \
        -v ${HOME}/docker_scratch:/tmp/docker_scratch \
        -w "/home/jenkins/build/${DIST}" -e FORCE="${FORCE}" \
        -e JENKINS_HOME="${JENKINS_HOME}" -e APP="${APP}" \
-       -e DIST="${DIST}" -e BRANCH="${BRANCH}" \
+       -e DIST="${DIST}" -e BRANCH="${BRANCH}" NOUPLOAD="${NOUPLOAD}" \
        -e LOGNAME="${LOGNAME}" -e SSH_AUTH_SOCK="${SSH_AUTH_SOCK}" \
        -e GPG_AGENT_INFO="${GPG_AGENT_INFO}" -e WORKSPACE="${WORKSPACE}" \
        -e GITNAME="${GITNAME}" -e GITEMAIL="${GITEMAIL}" \

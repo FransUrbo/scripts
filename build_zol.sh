@@ -192,7 +192,7 @@ ${gbp} --git-ignore-branch --git-keyid="${GPKGKEYID}" --git-tag \
 echo "=> Upload packages"
 changelog="/home/jenkins/build/${APP}-linux_$(head -n1 debian/changelog | \
     sed "s@.*(\(.*\)).*@\1@")_$(dpkg-architecture -qDEB_BUILD_ARCH).changes"
-dupload "${changelog}"
+[ -z "${NOUPLOAD}" ] && dupload "${changelog}"
 
 # Copy artifacts so they can be archived in Jenkins.
 mkdir -p artifacts
