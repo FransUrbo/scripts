@@ -1,0 +1,170 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<matrix-project plugin="matrix-project@1.6">
+  <actions/>
+  <description>Build ZFS On Linux ZFS for Wheezy/Jessie/Sid in Released/Dailies versions.</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>7</daysToKeep>
+        <numToKeep>4</numToKeep>
+        <artifactDaysToKeep>14</artifactDaysToKeep>
+        <artifactNumToKeep>8</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <com.coravy.hudson.plugins.github.GithubProjectProperty plugin="github@1.19.0">
+      <projectUrl>https://github.com/zfsonlinux/zfs/</projectUrl>
+      <displayName>zfs-autobuilder-debian</displayName>
+    </com.coravy.hudson.plugins.github.GithubProjectProperty>
+    <hudson.plugins.libvirt.BeforeJobSnapshotJobProperty plugin="libvirt-slave@1.8.5"/>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.plugins.matrix__configuration__parameter.MatrixCombinationsParameterDefinition plugin="matrix-combinations-parameter@1.0.9">
+          <name>DIST</name>
+          <description>What distribution to build for.</description>
+        </hudson.plugins.matrix__configuration__parameter.MatrixCombinationsParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>FORCE</name>
+          <description>Force a build (ignore last successful commit sha).</description>
+          <defaultValue>false</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+    <EnvInjectJobProperty plugin="envinject@1.92.1">
+      <info>
+        <loadFilesFromMaster>true</loadFilesFromMaster>
+      </info>
+      <on>true</on>
+      <keepJenkinsSystemVariables>true</keepJenkinsSystemVariables>
+      <keepBuildVariables>true</keepBuildVariables>
+      <overrideBuildParameters>false</overrideBuildParameters>
+      <contributors/>
+    </EnvInjectJobProperty>
+  </properties>
+  <scm class="hudson.plugins.git.GitSCM" plugin="git@2.4.4">
+    <configVersion>2</configVersion>
+    <userRemoteConfigs>
+      <hudson.plugins.git.UserRemoteConfig>
+        <name>zfs</name>
+        <url>https://github.com/zfsonlinux/zfs.git</url>
+        <credentialsId>2c1b7bd9-56ea-4e0d-81df-939b2434e843</credentialsId>
+      </hudson.plugins.git.UserRemoteConfig>
+      <hudson.plugins.git.UserRemoteConfig>
+        <name>pkg-zfs</name>
+        <url>https://github.com/zfsonlinux/pkg-zfs.git</url>
+        <credentialsId>2c1b7bd9-56ea-4e0d-81df-939b2434e843</credentialsId>
+      </hudson.plugins.git.UserRemoteConfig>
+    </userRemoteConfigs>
+    <branches>
+      <hudson.plugins.git.BranchSpec>
+        <name>remotes/pkg-spl/${BRANCH}/debian/${DIST}</name>
+      </hudson.plugins.git.BranchSpec>
+    </branches>
+    <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
+    <submoduleCfg class="list"/>
+    <extensions>
+      <hudson.plugins.git.extensions.impl.CleanBeforeCheckout/>
+      <hudson.plugins.git.extensions.impl.CheckoutOption>
+        <timeout>5</timeout>
+      </hudson.plugins.git.extensions.impl.CheckoutOption>
+      <hudson.plugins.git.extensions.impl.CloneOption>
+        <shallow>false</shallow>
+        <noTags>false</noTags>
+        <reference></reference>
+        <timeout>5</timeout>
+        <depth>0</depth>
+      </hudson.plugins.git.extensions.impl.CloneOption>
+      <hudson.plugins.git.extensions.impl.CleanCheckout/>
+    </extensions>
+  </scm>
+  <quietPeriod>7200</quietPeriod>
+  <scmCheckoutRetryCount>5</scmCheckoutRetryCount>
+  <canRoam>true</canRoam>
+  <disabled>false</disabled>
+  <blockBuildWhenDownstreamBuilding>false</blockBuildWhenDownstreamBuilding>
+  <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
+  <triggers>
+    <com.cloudbees.jenkins.GitHubPushTrigger plugin="github@1.19.0">
+      <spec></spec>
+    </com.cloudbees.jenkins.GitHubPushTrigger>
+  </triggers>
+  <concurrentBuild>true</concurrentBuild>
+  <axes>
+    <hudson.matrix.TextAxis>
+      <name>BRANCH</name>
+      <values>
+        <string>master</string>
+        <string>snapshot</string>
+      </values>
+    </hudson.matrix.TextAxis>
+    <hudson.matrix.TextAxis>
+      <name>DIST</name>
+      <values>
+        <string>wheezy</string>
+        <string>jessie</string>
+        <string>sid</string>
+      </values>
+    </hudson.matrix.TextAxis>
+  </axes>
+  <builders>
+    <org.jenkinsci.plugins.managedscripts.ScriptBuildStep plugin="managed-scripts@1.2.1">
+      <buildStepId>org.jenkinsci.plugins.managedscripts.ScriptConfig1462490649511</buildStepId>
+      <buildStepArgs>
+        <string>zfs</string>
+        <string>${DIST}</string>
+        <string>${BRANCH}</string>
+      </buildStepArgs>
+      <tokenized>false</tokenized>
+    </org.jenkinsci.plugins.managedscripts.ScriptBuildStep>
+  </builders>
+  <publishers>
+    <hudson.tasks.ArtifactArchiver>
+      <artifacts>artifacts/*</artifacts>
+      <allowEmptyArchive>false</allowEmptyArchive>
+      <onlyIfSuccessful>true</onlyIfSuccessful>
+      <fingerprint>true</fingerprint>
+      <defaultExcludes>true</defaultExcludes>
+      <caseSensitive>true</caseSensitive>
+    </hudson.tasks.ArtifactArchiver>
+    <hudson.tasks.Mailer plugin="mailer@1.17">
+      <recipients>turbo@bayour.com</recipients>
+      <dontNotifyEveryUnstableBuild>false</dontNotifyEveryUnstableBuild>
+      <sendToIndividuals>false</sendToIndividuals>
+    </hudson.tasks.Mailer>
+  </publishers>
+  <buildWrappers>
+    <hudson.plugins.timestamper.TimestamperBuildWrapper plugin="timestamper@1.7.4"/>
+    <EnvInjectBuildWrapper plugin="envinject@1.92.1">
+      <info>
+        <propertiesContent>GITNAME=&quot;Turbo Fredriksson - Autobuilder&quot;
+GITEMAIL=&quot;turbo@bayour.com&quot;
+GPGKEYID=&quot;4D5843EA&quot;</propertiesContent>
+        <loadFilesFromMaster>false</loadFilesFromMaster>
+      </info>
+    </EnvInjectBuildWrapper>
+    <EnvInjectPasswordWrapper plugin="envinject@1.92.1">
+      <injectGlobalPasswords>true</injectGlobalPasswords>
+      <maskPasswordParameters>true</maskPasswordParameters>
+      <passwordEntries>
+        <EnvInjectPasswordEntry>
+          <name>GPGPASS</name>
+          <value>SECRET_PASSWORD</value>
+        </EnvInjectPasswordEntry>
+        <EnvInjectPasswordEntry>
+          <name>GPGCACHEID</name>
+          <value>5YvcyeTRxR5tJne5LUV8B4JEW918kjGDyD4ILhAeIFoNy4NWxQZJXU+o6O1v5/M6TINtHJyuwzw1zBD+jxM21g==</value>
+        </EnvInjectPasswordEntry>
+      </passwordEntries>
+    </EnvInjectPasswordWrapper>
+    <com.cloudbees.jenkins.plugins.sshagent.SSHAgentBuildWrapper plugin="ssh-agent@1.10">
+      <credentialIds>
+        <string>2c1b7bd9-56ea-4e0d-81df-939b2434e843</string>
+      </credentialIds>
+      <ignoreMissing>false</ignoreMissing>
+    </com.cloudbees.jenkins.plugins.sshagent.SSHAgentBuildWrapper>
+    <org.jenkinsci.plugins.testinprogress.TestInProgressBuildWrapper plugin="testInProgress@1.4"/>
+  </buildWrappers>
+  <executionStrategy class="hudson.matrix.DefaultMatrixExecutionStrategyImpl">
+    <runSequentially>false</runSequentially>
+  </executionStrategy>
+</matrix-project>
