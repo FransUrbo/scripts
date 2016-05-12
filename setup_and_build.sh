@@ -1,7 +1,4 @@
-#!/bin/sh
-
-set -x
-set -e
+#!/bin/sh -xe
 
 # Path to the actual build script. This should be the only manual change
 # needed.
@@ -96,14 +93,15 @@ echo "${GPGPASS}" | /usr/lib/gnupg2/gpg-preset-passphrase -v -c ${GPGCACHEID}
 # Inside there is where the actual build takes place, using the
 # 'build_zol.zh' script.
 echo "=> Starting docker image debian:${DIST}-devel"
-docker -H tcp://127.0.0.1:2375 run \
-       -v ${HOME}/.gnupg:/root/.gnupg \
+docker -H tcp://127.0.0.1:2375 run -u jenkins \
+       -v ${HOME}/.gnupg:/home/jenkins/.gnupg:ro \
        -v $(dirname ${SSH_AUTH_SOCK}):$(dirname ${SSH_AUTH_SOCK}) \
        -v $(dirname ${GPG_AGENT_INFO}):$(dirname ${GPG_AGENT_INFO}) \
-       -v ${WORKSPACE}:${WORKSPACE} \
+       -v $(dirname ${WORKSPACE}):/home/jenkins/build \
        -v ${HOME}/docker_scratch:/tmp/docker_scratch \
-       -w ${WORKSPACE} -e FORCE="${FORCE}" \
-       -e APP="${APP}" -e DIST="${DIST}" -e BRANCH="${BRANCH}" \
+       -w "/home/jenkins/build/${DIST}" -e FORCE="${FORCE}" \
+       -e JENKINS_HOME="${JENKINS_HOME}" -e APP="${APP}" \
+       -e DIST="${DIST}" -e BRANCH="${BRANCH}" \
        -e LOGNAME="${LOGNAME}" -e SSH_AUTH_SOCK="${SSH_AUTH_SOCK}" \
        -e GPG_AGENT_INFO="${GPG_AGENT_INFO}" -e WORKSPACE="${WORKSPACE}" \
        -e GITNAME="${GITNAME}" -e GITEMAIL="${GITEMAIL}" \
