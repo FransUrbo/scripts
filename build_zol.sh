@@ -1,7 +1,4 @@
-#!/bin/sh
-
-# Path to repository with packaging.
-GIT_APP_REPO="git@github.com:zfsonlinux/pkg-${APP}.git"
+#!/bin/sh -xe
 
 # No checking for correct, missing or faulty values will be done in this
 # script. This is the second part of a automated build process and is
@@ -13,11 +10,12 @@ GIT_APP_REPO="git@github.com:zfsonlinux/pkg-${APP}.git"
 # pkg-{spl,zfs} repositories. The 'master' tree is the released versions
 # and 'snapshot' are the dailies.
 #
+# If running under Jenkins, it is/should be responsible for checking out
+# the code into WORKDIR. If $JENKINS_HOME is NOT set (as in not running
+# under Jenkins), the code will be cloned and checked out.
+#
 # Copyright 2016 Turbo Fredriksson <turbo@bayour.com>.
 # Released under GPL, version of your choosing.
-
-set -x
-set -e
 
 echo "=> Building (${APP}/${DIST}/${BRANCH})"
 
@@ -26,32 +24,33 @@ echo "=> Building (${APP}/${DIST}/${BRANCH})"
 # scratch dir), then use that.
 # To avoid a 'Do you really want to connect' question, make sure that the
 # hosts we're using is all in there.
-if [ ! -f "/root/.ssh/known_hosts" -a "/tmp/docker_scratch/known_hosts" ]
+if [ ! -f "${HOME}/.ssh/known_hosts" -a "/tmp/docker_scratch/known_hosts" ]
 then
     # We probably don't have the .ssh directory either, so create it.
-    [ -d "/root/.ssh" ] || mkdir -p /root/.ssh
-    cp /tmp/docker_scratch/known_hosts /root/.ssh/known_hosts
+    [ -d "${HOME}/.ssh" ] || mkdir -p "${HOME}/.ssh"
+    cp /tmp/docker_scratch/known_hosts "${HOME}/.ssh/known_hosts"
 fi
 
 # --------------------------------
 # --> C O D E  C H E C K O U T <--
 # --------------------------------
 
-# Checking out the code.
-git clone --origin pkg-${APP} ${GIT_APP_REPO}
-cd pkg-${APP}
+if [ -z "${JENKINS_HOME}" ]; then
+    # Checking out the code.
+    git clone --origin pkg-${APP} ${GIT_APP_REPO}
+    cd pkg-${APP}
 
-# Add remote ${APP}.
-git remote add ${APP} git@github.com:zfsonlinux/${APP}.git
-git fetch ${APP}
-
-# Setup user for commits.
-git config --global user.name "${GITNAME}"
-git config --global user.email "${GITEMAIL}"
+    # Add remote ${APP}.
+    git remote add ${APP} git@github.com:zfsonlinux/${APP}.git
+    git fetch ${APP}
+fi
 
 # ----------------------------------
 # --> C O D E  D I S C O V E R Y <--
 # ----------------------------------
+
+# NOTE: Jenkins checkes out a commitId, even if a branch is specified!!
+#       Also, it don't seem to be possible to use build variables in there.
 
 # 1. Checkout the correct branch.
 if ! git show pkg-${APP}/${BRANCH}/debian/${DIST} > /dev/null 2>&1; then
@@ -74,7 +73,7 @@ fi
 # 3. Make sure that the code in the branch have changed.
 sha="$(git log --pretty=oneline --abbrev-commit ${branch} | \
     head -n1 | sed 's@ .*@@')"
-if [ "${FORCE}" = "true" -a \
+if [ "${FORCE}" = "false" -a \
      -f "/tmp/docker_scratch/lastSuccessfulSha-${APP}-${DIST}-${BRANCH}" ]
 then
     file="/tmp/docker_scratch/lastSuccessfulSha-${APP}-${DIST}-${BRANCH}"
@@ -91,7 +90,7 @@ fi
 git merge -Xtheirs --no-edit ${branch} 2>&1 | \
     grep -q "^Already up-to-date.$" && \
     no_change=1
-if [ "${FORCE}" = "true" -a "${no_change}" = "1" -a "${DIST}" != "sid" ]
+if [ "${FORCE}" = "false" -a "${no_change}" = "1" -a "${DIST}" != "sid" ]
 then
     echo "=> No point in building - same as previous version."
     exit 0
@@ -144,12 +143,15 @@ else
     dist="${DIST}"
     msg="upstream"
 fi
-debchange --distribution "${dist}" --newversion "${pkg_version}" \
-	  --force-bad-version --force-distribution \
-	  --maintmaint "New $msg release - ${sha}."
 
-git add debian/changelog debian/gbp.conf
-git commit -m "New daily release - $(date -R)/${sha}."
+changed="$(git status | grep -E 'modified:|deleted:|new file:' | wc -l)"
+if [ "${changed}" -gt 0 ]; then
+    # Only change the changelog if we have to!
+    debchange --distribution "${dist}" --newversion "${pkg_version}" \
+	      --force-bad-version --force-distribution \
+	      --maintmaint "New $msg release - ${sha}."
+fi
+
 
 # -----------------------------------
 # --> S T A R T  T H E  B U I L D <--
@@ -176,8 +178,11 @@ echo "=> Build the packages"
 type git-buildpackage > /dev/null 2>&1 && \
     gbp="git-buildpackage" || gbp="gbp buildpackage"
 
+[ "${FORCE}" = "true" ] && retag="--git-retag"
 ${gbp} --git-ignore-branch --git-keyid="${GPKGKEYID}" --git-tag \
-       --git-ignore-new --git-builder="debuild -i -I -k${GPGKEYID}" 
+       --git-ignore-new --git-builder="debuild -i -I -k${GPGKEYID}" \
+       ${retag}
+
 
 # ------------------------
 # --> F I N I S H  U P <--
@@ -185,10 +190,44 @@ ${gbp} --git-ignore-branch --git-keyid="${GPKGKEYID}" --git-tag \
 
 # Upload packages
 echo "=> Upload packages"
-dupload ${WORKSPACE}/*.changes
+changelog="/home/jenkins/build/${APP}-linux_$(head -n1 debian/changelog | \
+    sed "s@.*(\(.*\)).*@\1@")_$(dpkg-architecture -qDEB_BUILD_ARCH).changes"
+dupload "${changelog}"
 
-# Push our changes to GitHub
-git push --all
+# Copy artifacts so they can be archived in Jenkins.
+mkdir -p artifacts
+cat "${changelog}" | \
+while read line; do
+    # Read up to the first '^Checksums-*' line.
+    if echo "${line}" | grep -q "^Checksums-"; then
+        files="$(while read line; do
+	    # Keep reading up to next '^Checksums-*' line.
+	    echo "${line}" | grep -Eq "^Checksums-" && \
+	    break || \
+	    echo "${line}" | sed 's@.* @../@'
+	done)"
+
+	IFS="
+"
+	cp $(echo "${files}") "${changelog}" artifacts/
+	break
+    fi
+done
+
+# TODO: Let Jenkins deal with this?
+#if [ -z "${JENKINS_HOME}" ]; then
+    if [ "${changed}" ]; then
+	# Setup user for commits.
+	git config --global user.name "${GITNAME}"
+	git config --global user.email "${GITEMAIL}"
+
+	git add META debian/changelog debian/gbp.conf
+	git commit -m "New daily release - $(date -R)/${sha}."
+    fi
+
+    # Push our changes to GitHub
+    #git push --all
+#fi
 
 # Record changes
 echo "=> Recording successful build (${sha})"
