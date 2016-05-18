@@ -1,19 +1,14 @@
 #!/bin/sh
 
-if [ "$USER" != "root" ]; then
-	echo "Needs to be root to be usable."
-	exit 1
-fi
-
-sensors | egrep ' Fan| Temp' ; echo
-
-for dev in /dev/hd? /dev/sd?; do
+find /dev/disk/by-vdev/ -type l | sort | grep -v part |
+while read dev; do
     if echo "$dev" | grep -q '/hd'; then
         type=ata
     else
         type=auto
     fi
 
+#    echo "    smartctl -d $type -a $dev 2>&1 | grep Temperature_Celsius"
     smartctl -d $type -a $dev 2>&1 | grep Temperature_Celsius | \
         while read line; do
             # 194 Temperature_Celsius     0x0022   048   054   000    Old_age   Always       -       48 (Lifetime Min/Max 0/23)
@@ -29,6 +24,6 @@ for dev in /dev/hd? /dev/sd?; do
             [ -z "$tmp2" -o "$tmp2" = "0" ] && tmp2="  "
             [ -z "$tmp3" -o "$tmp3" = "0" ] && tmp3="  "
 
-            printf "$dev Temp:    +$tmp1°C  (low  =   %-2s°C, high =   %-2s°C)\n" "+$tmp2" "+$tmp3"
+            printf "$(basename $dev):  +$tmp1°C  (low  =   %-2s°C, high =   %-2s°C)\n" "+$tmp2" "+$tmp3"
         done
 done
