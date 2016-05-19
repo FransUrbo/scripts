@@ -112,6 +112,31 @@
     </hudson.matrix.TextAxis>
   </axes>
   <builders>
+    <hudson.tasks.Shell>
+      <command>#!/bin/sh
+
+FILE=&quot;${JENKINS_HOME}/docker_scratch/.Build_ZoL_ZFS_${BUILD_NUMBER}_env&quot;
+
+touch &quot;${FILE}&quot;
+chmod 600 &quot;${FILE}&quot;
+
+echo &quot;GITNAME=&apos;${GITNAME}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+echo &quot;GITEMAIL=&apos;${GITEMAIL}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+
+echo &quot;GPGKEYID=&apos;${GPGKEYID}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+echo &quot;GPGPASS=&apos;${GPGPASS}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+echo &quot;GPGCACHEID=&apos;${GPGCACHEID}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+
+echo &quot;APP=&apos;${APP}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+echo &quot;BRANCH=&apos;${BRANCH}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+echo &quot;DIST=&apos;${DIST}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+
+echo &quot;FORCE=&apos;${FORCE}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+echo &quot;NOUPLOAD=&apos;${NOUPLOAD}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+
+exit 0
+</command>
+    </hudson.tasks.Shell>
     <org.jenkinsci.plugins.managedscripts.ScriptBuildStep plugin="managed-scripts@1.2.1">
       <buildStepId>org.jenkinsci.plugins.managedscripts.ScriptConfig1462490649511</buildStepId>
       <buildStepArgs>
@@ -123,6 +148,19 @@
     </org.jenkinsci.plugins.managedscripts.ScriptBuildStep>
   </builders>
   <publishers>
+    <org.jenkinsci.plugins.postbuildscript.PostBuildScript plugin="postbuildscript@0.17">
+      <buildSteps>
+        <EnvInjectBuilder plugin="envinject@1.92.1">
+          <info>
+            <propertiesFilePath>${JENKINS_HOME}/docker_scratch/.Build_ZoL_ZFS_${BUILD_NUMBER}_env</propertiesFilePath>
+          </info>
+        </EnvInjectBuilder>
+      </buildSteps>
+      <scriptOnlyIfSuccess>true</scriptOnlyIfSuccess>
+      <scriptOnlyIfFailure>false</scriptOnlyIfFailure>
+      <markBuildUnstable>false</markBuildUnstable>
+      <executeOn>MATRIX</executeOn>
+    </org.jenkinsci.plugins.postbuildscript.PostBuildScript>
     <hudson.tasks.ArtifactArchiver>
       <artifacts>artifacts/*</artifacts>
       <allowEmptyArchive>false</allowEmptyArchive>
