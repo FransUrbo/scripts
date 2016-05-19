@@ -56,7 +56,7 @@
       </hudson.plugins.git.UserRemoteConfig>
       <hudson.plugins.git.UserRemoteConfig>
         <name>pkg-spl</name>
-        <url>https://github.com/zfsonlinux/pkg-spl.git</url>
+        <url>git@github.com:zfsonlinux/pkg-spl.git</url>
         <credentialsId>2c1b7bd9-56ea-4e0d-81df-939b2434e843</credentialsId>
       </hudson.plugins.git.UserRemoteConfig>
     </userRemoteConfigs>
