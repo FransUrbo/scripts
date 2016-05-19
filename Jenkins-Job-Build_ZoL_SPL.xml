@@ -117,7 +117,7 @@
 
 FILE=&quot;${JENKINS_HOME}/docker_scratch/.Build_ZoL_SPL_${BUILD_NUMBER}_env&quot;
 
-touch &quot;${FILE}&quot;
+: &gt; &quot;${FILE}&quot;
 chmod 600 &quot;${FILE}&quot;
 
 echo &quot;export GITNAME=&apos;${GITNAME}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
