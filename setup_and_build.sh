@@ -109,15 +109,16 @@ echo "${GPGPASS}" | /usr/lib/gnupg2/gpg-preset-passphrase -v -c ${GPGCACHEID}
 # 'build_zol.zh' script.
 echo "=> Starting docker image debian:${DIST}-devel"
 docker -H tcp://127.0.0.1:2375 run -u jenkins \
-       -v ${HOME}/.gnupg:/home/jenkins/.gnupg:ro \
+       -v ${HOME}/.gnupg:/home/jenkins/.gnupg \
        -v $(dirname ${SSH_AUTH_SOCK}):$(dirname ${SSH_AUTH_SOCK}) \
        -v $(dirname ${GPG_AGENT_INFO}):$(dirname ${GPG_AGENT_INFO}) \
        -v $(dirname ${WORKSPACE}):/home/jenkins/build \
        -v ${HOME}/docker_scratch:/tmp/docker_scratch \
        -w "/home/jenkins/build/${DIST}" -e FORCE="${FORCE}" \
        -e JENKINS_HOME="${JENKINS_HOME}" -e APP="${APP}" \
-       -e DIST="${DIST}" -e BRANCH="${BRANCH}" NOUPLOAD="${NOUPLOAD}" \
+       -e DIST="${DIST}" -e BRANCH="${BRANCH}" -e NOUPLOAD="${NOUPLOAD}" \
        -e LOGNAME="${LOGNAME}" -e SSH_AUTH_SOCK="${SSH_AUTH_SOCK}" \
        -e GPG_AGENT_INFO="${GPG_AGENT_INFO}" -e WORKSPACE="${WORKSPACE}" \
        -e GITNAME="${GITNAME}" -e GITEMAIL="${GITEMAIL}" \
-       -e GPGKEYID="${GPGKEYID}" --rm ${IT} debian:${DIST}-devel ${script}
+       -e payload="${payload}" -e GPGKEYID="${GPGKEYID}" --rm \
+       ${IT} debian:${DIST}-devel ${script}
