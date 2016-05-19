@@ -28,6 +28,11 @@
           <description>Force a build (ignore last successful commit sha).</description>
           <defaultValue>false</defaultValue>
         </hudson.model.BooleanParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>NOUPLOAD</name>
+          <description>If set, no upload of artifacts will be done in the build script.</description>
+          <defaultValue>false</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
       </parameterDefinitions>
     </hudson.model.ParametersDefinitionProperty>
     <EnvInjectJobProperty plugin="envinject@1.92.1">
@@ -57,7 +62,7 @@
     </userRemoteConfigs>
     <branches>
       <hudson.plugins.git.BranchSpec>
-        <name>remotes/pkg-spl/${BRANCH}/debian/${DIST}</name>
+        <name>*/master</name>
       </hudson.plugins.git.BranchSpec>
     </branches>
     <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
