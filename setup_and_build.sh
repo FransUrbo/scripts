@@ -107,7 +107,7 @@ echo "${GPGPASS}" | /usr/lib/gnupg2/gpg-preset-passphrase -v -c ${GPGCACHEID}
 # Start a docker container.
 # Inside there is where the actual build takes place, using the
 # 'build_zol.zh' script.
-echo "=> Starting docker image debian:${DIST}-devel"
+echo "=> Starting docker image fransurbo/${DIST}-devel:latest"
 docker -H tcp://127.0.0.1:2375 run -u jenkins \
        -v ${HOME}/.gnupg:/home/jenkins/.gnupg \
        -v $(dirname ${SSH_AUTH_SOCK}):$(dirname ${SSH_AUTH_SOCK}) \
@@ -121,4 +121,4 @@ docker -H tcp://127.0.0.1:2375 run -u jenkins \
        -e GPG_AGENT_INFO="${GPG_AGENT_INFO}" -e WORKSPACE="${WORKSPACE}" \
        -e GITNAME="${GITNAME}" -e GITEMAIL="${GITEMAIL}" \
        -e payload="${payload}" -e GPGKEYID="${GPGKEYID}" --rm \
-       ${IT} debian:${DIST}-devel ${script}
+       ${IT} fransurbo/${DIST}-devel:latest ${script}
