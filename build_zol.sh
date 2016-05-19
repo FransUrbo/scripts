@@ -248,7 +248,8 @@ while read line; do
 done
 
 # Push our changes to GitHub
-#git push --all
+git push pkg-${app} --all
+git push pkg-${app} --tags
 
 # Record changes
 echo "=> Recording successful build (${sha})"
