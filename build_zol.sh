@@ -19,6 +19,13 @@
 
 echo "=> Building (${APP}/${DIST}/${BRANCH})"
 
+if [ -n "${payload}" ]; then
+    echo "====================="
+    echo "payload:"
+    echo "${payload}"
+    echo "====================="
+fi
+
 # If we haven't mounted the $HOME/.ssh directory into the Docker container,
 # the known_hosts don't exit. However, if we have a local copy (in the
 # scratch dir), then use that.
@@ -31,13 +38,17 @@ then
     cp /tmp/docker_scratch/known_hosts "${HOME}/.ssh/known_hosts"
 fi
 
+# Setup user for commits (including merges).
+git config --global user.name "${GITNAME}"
+git config --global user.email "${GITEMAIL}"
+
 # --------------------------------
 # --> C O D E  C H E C K O U T <--
 # --------------------------------
 
 if [ -z "${JENKINS_HOME}" ]; then
     # Checking out the code.
-    git clone --origin pkg-${APP} ${GIT_APP_REPO}
+    git clone --origin pkg-${APP} git@github.com:zfsonlinux/pkg-${APP}.git
     cd pkg-${APP}
 
     # Add remote ${APP}.
@@ -135,9 +146,9 @@ if [ "${BRANCH}" = "snapshot" ]; then
     sudo mkdir -p "${CHANGES_DIR}"
     if [ ! -f "${CHANGES_DIR}/known-dists" ]
     then
-	echo "${dist}" >  "${CHANGES_DIR}/known-dists"
+	echo "${dist}" | sudo tee "${CHANGES_DIR}/known-dists" > /dev/null
     else
-	echo "${dist}" >> "${CHANGES_DIR}/known-dists"
+	echo "${dist}" | sudo tee -a "${CHANGES_DIR}/known-dists" > /dev/null
     fi
 else
     dist="${DIST}"
@@ -173,6 +184,11 @@ while [ -n "${deps}" ]; do
     fi
 done
 
+if [ "${changed}" -gt 0 ]; then
+    git add META debian/changelog debian/gbp.conf
+    git commit -m "New daily release - $(date -R)/${sha}."
+fi
+
 # Build packages
 echo "=> Build the packages"
 type git-buildpackage > /dev/null 2>&1 && \
@@ -189,45 +205,50 @@ ${gbp} --git-ignore-branch --git-keyid="${GPKGKEYID}" --git-tag \
 # ------------------------
 
 # Upload packages
-echo "=> Upload packages"
-changelog="/home/jenkins/build/${APP}-linux_$(head -n1 debian/changelog | \
+changelog="${APP}-linux_$(head -n1 debian/changelog | \
     sed "s@.*(\(.*\)).*@\1@")_$(dpkg-architecture -qDEB_BUILD_ARCH).changes"
-[ -z "${NOUPLOAD}" ] && dupload "${changelog}"
+
+# Need to set the directory to the artifacts.
+dir="/home/jenkins/build/"
+
+# Possibly do the upload
+if [ "${NOUPLOAD}" = "false" ]; then
+    echo "=> Upload packages"
+    dupload "${dir}${changelog}"
+fi
 
 # Copy artifacts so they can be archived in Jenkins.
-mkdir -p artifacts
-cat "${changelog}" | \
+if [ -z "${JENKINS_HOME}" ]; then
+    # If not running under Jenkins, we need to add
+    # 'pkg-${APP}' to the path.
+    adir="${dir}/${DIST}/pkg-${APP}/artifacts"
+else
+    adir="${dir}/${DIST}/artifacts"
+fi
+mkdir -p "${adir}"
+
+# Read the changelog up to the first '^Checksums-*' line.
+cat "${dir}${changelog}" | \
 while read line; do
-    # Read up to the first '^Checksums-*' line.
     if echo "${line}" | grep -q "^Checksums-"; then
         files="$(while read line; do
 	    # Keep reading up to next '^Checksums-*' line.
 	    echo "${line}" | grep -Eq "^Checksums-" && \
 	    break || \
-	    echo "${line}" | sed 's@.* @../@'
+	    echo "${line}" | sed "s@.* @${dir}@"
 	done)"
 
+	OLD_IFS="${IFS}"
 	IFS="
 "
-	cp $(echo "${files}") "${changelog}" artifacts/
+	cp $(echo "${files}") "${dir}${changelog}" "${adir}"
+	IFS="${OLD_IFS}"
 	break
     fi
 done
 
-# TODO: Let Jenkins deal with this?
-#if [ -z "${JENKINS_HOME}" ]; then
-    if [ "${changed}" ]; then
-	# Setup user for commits.
-	git config --global user.name "${GITNAME}"
-	git config --global user.email "${GITEMAIL}"
-
-	git add META debian/changelog debian/gbp.conf
-	git commit -m "New daily release - $(date -R)/${sha}."
-    fi
-
-    # Push our changes to GitHub
-    #git push --all
-#fi
+# Push our changes to GitHub
+#git push --all
 
 # Record changes
 echo "=> Recording successful build (${sha})"
