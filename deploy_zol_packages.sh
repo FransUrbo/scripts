@@ -29,11 +29,26 @@ stop_gpg_agent() {
     echo "=> Stop the GPG Agent"
     echo "${GPG_AGENT_INFO}" | sed "s,.*:\(.*\):.*,\1," | \
 	xargs --no-run-if-empty kill
+
+    echo "=> Removing lock file"
+    rm -f /var/tmp/deploy_zol_packages.lock
 }
 trap stop_gpg_agent EXIT SIGABRT
 
-if [ -z "${GPGCACHEID}"; then
+if [ -n "${1}" -a -e "${1}" ]; then
+	. "${1}"
+	rm -f "${1}"
+fi
+
+if [ -z "${GPGCACHEID}" ]; then
 	echo "Required environment variable: GPGCACHEID"
+	exit 1
+fi
+
+[ "${NOUPLOAD}" == "true" ] && exit 0
+
+if [ -f "/var/tmp/deploy_zol_packages.lock" ]; then
+	echo "Already running."
 	exit 1
 fi
 
@@ -54,6 +69,9 @@ if [ -z "${GPGPASS}" -a -n "${STY}" ]; then
 	read -s GPGPASS
 fi
 echo "${GPGPASS}" | /usr/lib/gnupg2/gpg-preset-passphrase  -v -c ${GPGCACHEID}
+
+echo "=> Creating lockfile"
+touch /var/tmp/deploy_zol_packages.lock
 
 cd "${S3_REPO_DIR}"
 
