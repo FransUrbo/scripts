@@ -223,7 +223,7 @@ changelog="${APP}-linux_$(head -n1 debian/changelog | \
 dir="/home/jenkins/build/"
 
 # Possibly do the upload
-if [ "${NOUPLOAD}" = "false" ]; then
+if [ "${NOUPLOAD}" = "false" -o -z "${NOUPLOAD}" ]; then
     echo "=> Upload packages"
     dupload "${dir}${changelog}"
 fi
