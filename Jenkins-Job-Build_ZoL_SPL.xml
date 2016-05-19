@@ -120,19 +120,19 @@ FILE=&quot;${JENKINS_HOME}/docker_scratch/.Build_ZoL_SPL_${BUILD_NUMBER}_env&quo
 touch &quot;${FILE}&quot;
 chmod 600 &quot;${FILE}&quot;
 
-echo &quot;GITNAME=&apos;${GITNAME}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
-echo &quot;GITEMAIL=&apos;${GITEMAIL}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+echo &quot;export GITNAME=&apos;${GITNAME}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+echo &quot;export GITEMAIL=&apos;${GITEMAIL}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
 
-echo &quot;GPGKEYID=&apos;${GPGKEYID}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
-echo &quot;GPGPASS=&apos;${GPGPASS}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
-echo &quot;GPGCACHEID=&apos;${GPGCACHEID}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+echo &quot;export GPGKEYID=&apos;${GPGKEYID}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+echo &quot;export GPGPASS=&apos;${GPGPASS}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+echo &quot;export GPGCACHEID=&apos;${GPGCACHEID}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
 
-echo &quot;APP=&apos;${APP}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
-echo &quot;BRANCH=&apos;${BRANCH}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
-echo &quot;DIST=&apos;${DIST}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+echo &quot;export APP=&apos;${APP}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+echo &quot;export BRANCH=&apos;${BRANCH}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+echo &quot;export DIST=&apos;${DIST}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
 
-echo &quot;FORCE=&apos;${FORCE}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
-echo &quot;NOUPLOAD=&apos;${NOUPLOAD}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+echo &quot;export FORCE=&apos;${FORCE}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
+echo &quot;export NOUPLOAD=&apos;${NOUPLOAD}&apos;&quot; &gt;&gt; &quot;${FILE}&quot;
 
 exit 0
 </command>
@@ -150,15 +150,63 @@ exit 0
   <publishers>
     <org.jenkinsci.plugins.postbuildscript.PostBuildScript plugin="postbuildscript@0.17">
       <buildSteps>
-        <EnvInjectBuilder plugin="envinject@1.92.1">
-          <info>
-            <propertiesFilePath>${JENKINS_HOME}/docker_scratch/.Build_ZoL_SPL_${BUILD_NUMBER}_env</propertiesFilePath>
-          </info>
-        </EnvInjectBuilder>
+        <hudson.tasks.Shell>
+          <command>#!/bin/sh
+
+mv &quot;${JENKINS_HOME}/docker_scratch/.Build_ZoL_SPL_${BUILD_NUMBER}_env&quot; \
+	&quot;${WORKSPACE}/.Build_ZoL_SPL_${BUILD_NUMBER}_env&quot;</command>
+        </hudson.tasks.Shell>
+        <jenkins.plugins.publish__over__ssh.BapSshBuilderPlugin plugin="publish-over-ssh@1.14">
+          <delegate>
+            <consolePrefix>SSH: </consolePrefix>
+            <delegate>
+              <publishers>
+                <jenkins.plugins.publish__over__ssh.BapSshPublisher>
+                  <configName>Celia</configName>
+                  <verbose>true</verbose>
+                  <transfers>
+                    <jenkins.plugins.publish__over__ssh.BapSshTransfer>
+                      <remoteDirectory></remoteDirectory>
+                      <sourceFiles>.Build_ZoL_SPL_${BUILD_NUMBER}_env</sourceFiles>
+                      <excludes></excludes>
+                      <removePrefix></removePrefix>
+                      <remoteDirectorySDF>false</remoteDirectorySDF>
+                      <flatten>false</flatten>
+                      <cleanRemote>false</cleanRemote>
+                      <noDefaultExcludes>false</noDefaultExcludes>
+                      <makeEmptyDirs>false</makeEmptyDirs>
+                      <patternSeparator>[, ]+</patternSeparator>
+                      <execCommand>/usr/local/sbin/deploy_zol_packages.sh .Build_ZoL_ZFS_${BUILD_NUMBER}_env</execCommand>
+                      <execTimeout>120000</execTimeout>
+                      <usePty>false</usePty>
+                    </jenkins.plugins.publish__over__ssh.BapSshTransfer>
+                  </transfers>
+                  <useWorkspaceInPromotion>false</useWorkspaceInPromotion>
+                  <usePromotionTimestamp>false</usePromotionTimestamp>
+                  <credentials class="jenkins.plugins.publish_over_ssh.BapSshCredentials">
+                    <secretPassphrase>SECRET_PASSWORD</secretPassphrase>
+                    <key></key>
+                    <keyPath>/var/lib/jenkins/.ssh/id_rsa</keyPath>
+                    <username>USERNAME</username>
+                  </credentials>
+                </jenkins.plugins.publish__over__ssh.BapSshPublisher>
+              </publishers>
+              <continueOnError>false</continueOnError>
+              <failOnError>false</failOnError>
+              <alwaysPublishFromMaster>false</alwaysPublishFromMaster>
+              <hostConfigurationAccess class="jenkins.plugins.publish_over_ssh.BapSshPublisherPlugin" reference="../.."/>
+            </delegate>
+          </delegate>
+        </jenkins.plugins.publish__over__ssh.BapSshBuilderPlugin>
+        <hudson.tasks.Shell>
+          <command>#!/bin/sh
+
+rm -f &quot;${WORKSPACE}/.Build_ZoL_SPL_${BUILD_NUMBER}_env&quot;</command>
+        </hudson.tasks.Shell>
       </buildSteps>
       <scriptOnlyIfSuccess>true</scriptOnlyIfSuccess>
       <scriptOnlyIfFailure>false</scriptOnlyIfFailure>
-      <markBuildUnstable>false</markBuildUnstable>
+      <markBuildUnstable>true</markBuildUnstable>
       <executeOn>MATRIX</executeOn>
     </org.jenkinsci.plugins.postbuildscript.PostBuildScript>
     <hudson.tasks.ArtifactArchiver>
@@ -170,7 +218,7 @@ exit 0
       <caseSensitive>true</caseSensitive>
     </hudson.tasks.ArtifactArchiver>
     <hudson.tasks.Mailer plugin="mailer@1.17">
-      <recipients>turbo@bayour.com</recipients>
+      <recipients>USERNAME@DOMAIN.TLD</recipients>
       <dontNotifyEveryUnstableBuild>false</dontNotifyEveryUnstableBuild>
       <sendToIndividuals>false</sendToIndividuals>
     </hudson.tasks.Mailer>
@@ -179,8 +227,8 @@ exit 0
     <hudson.plugins.timestamper.TimestamperBuildWrapper plugin="timestamper@1.7.4"/>
     <EnvInjectBuildWrapper plugin="envinject@1.92.1">
       <info>
-        <propertiesContent>GITNAME=&quot;Turbo Fredriksson - Autobuilder&quot;
-GITEMAIL=&quot;turbo@bayour.com&quot;
+        <propertiesContent>GITNAME=&quot;User Name - Autobuilder&quot;
+GITEMAIL=&quot;USERNAME@DOMAIN.TLD&quot;
 GPGKEYID=&quot;4D5843EA&quot;</propertiesContent>
         <loadFilesFromMaster>false</loadFilesFromMaster>
       </info>
@@ -195,7 +243,7 @@ GPGKEYID=&quot;4D5843EA&quot;</propertiesContent>
         </EnvInjectPasswordEntry>
         <EnvInjectPasswordEntry>
           <name>GPGCACHEID</name>
-          <value>5YvcyeTRxR5tJne5LUV8B4JEW918kjGDyD4ILhAeIFoNy4NWxQZJXU+o6O1v5/M6TINtHJyuwzw1zBD+jxM21g==</value>
+          <value>SECRET_CACHEID</value>
         </EnvInjectPasswordEntry>
       </passwordEntries>
     </EnvInjectPasswordWrapper>
