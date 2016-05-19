@@ -32,6 +32,11 @@ stop_gpg_agent() {
 }
 trap stop_gpg_agent EXIT SIGABRT
 
+if [ -z "${GPGCACHEID}"; then
+	echo "Required environment variable: GPGCACHEID"
+	exit 1
+fi
+
 # -----------------------------------------
 # --> S T A R T   G N U P G   A G E N T <--
 # -----------------------------------------
@@ -42,6 +47,11 @@ echo "=> Start and prime gnupg"
 if ! gpg-connect-agent /bye 2> /dev/null; then
 	eval $(gpg-agent --daemon --allow-preset-passphrase \
 		--write-env-file "${HOME}/.gpg-agent.info")
+fi
+if [ -z "${GPGPASS}" -a -n "${STY}" ]; then
+	# GPGPASS unset but (hopefully/probably) interactive - ask for the pw.
+	echo -n "Enter GPG passphrase: "
+	read -s GPGPASS
 fi
 echo "${GPGPASS}" | /usr/lib/gnupg2/gpg-preset-passphrase  -v -c ${GPGCACHEID}
 
