@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 # Paths to the repo and incoming directory. This should be the only manual
 # change needed.
@@ -22,8 +22,6 @@ REPREPRO="reprepro --ignore=surprisingbinary --export=never"
 # Start a GNUPG Agent and prime the passphrase so that signing of the
 # packages etc work without intervention.
 
-set -e
-
 # Kill the GPG Agent
 stop_gpg_agent() {
     echo "=> Stop the GPG Agent"
@@ -35,9 +33,9 @@ stop_gpg_agent() {
 }
 trap stop_gpg_agent EXIT SIGABRT
 
-if [ -n "${1}" -a -e "${1}" ]; then
-	. "${1}"
-	rm -f "${1}"
+if [ -n "${1}" -a -e "${INCOMING_DIR}/${1}" ]; then
+	. "${INCOMING_DIR}/${1}"
+	rm -f "${INCOMING_DIR}/${1}"
 fi
 
 if [ -z "${GPGCACHEID}" ]; then
