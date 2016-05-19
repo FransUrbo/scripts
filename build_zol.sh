@@ -113,8 +113,19 @@ nr="$(head -n1 debian/changelog | sed -e "s@.*(\(.*\)).*@\1@" \
     -e "s@^\(.*\)-\([0-9]\+\)-\(.*\)\$@\2@" -e "s@^\(.*\)-\([0-9]\+\)\$@\2@")"
 pkg_version="$(git describe ${branch} | sed "s@^${APP}-@@")"
 if [ "${BRANCH}" = "snapshot" ]; then
+    # Allow seemless upgrades between released -> dailies -> different dists.
+    # => "0.6.5.6-8-wheezy"                        <= "0.6.5.990-245-gf00828e-244-wheezy-daily"
+    # => "0.6.5.990-245-gf00828e-244-wheezy-daily" <= "0.6.5.991-245-gf00828e-244-jessie-daily"
+    # => !! Can't go from "dailies" to "released" though !!
+    case "${DIST}" in
+	wheezy)	subver=".990";;
+	jessie)	subver=".991";;
+	sid)	subver=".999";;
+	*)	subver="";;
+    esac
+
     pkg_version="$(echo "${pkg_version}" | \
-	sed "s@\([0-9]\.[0-9]\.[0-9]\)-\(.*\)@\1.999-\2@")-${DIST}-daily"
+	sed "s@\([0-9]\.[0-9]\.[0-9]\)-\(.*\)@\1${subver}-\2@")-${DIST}-daily"
 else
     pkg_version="${pkg_version}-$(expr ${nr} + 1)-${DIST}"
 fi
