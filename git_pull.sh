@@ -7,7 +7,7 @@ if git status | egrep -q 'modified:|new file:|deleted:'; then
 fi
 
 echo "=> git fetch"
-git fetch --recurse-submodules
+git fetch --recurse-submodules --all
 
 if [ -f ".gitmodules" ]; then
 	echo "=> git submodule update"
@@ -15,7 +15,7 @@ if [ -f ".gitmodules" ]; then
 fi
 
 echo "=> git slog origin/master..HEAD"
-git log --pretty=oneline --abbrev-commit origin/master..HEAD
+git log --pretty=oneline --abbrev-commit origin/master...HEAD
 
 echo "=> git rebase origin/master"
 git rebase origin/master
