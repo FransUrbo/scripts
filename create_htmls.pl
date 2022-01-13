@@ -5,6 +5,8 @@
 #
 # Use at your own risk...
 #
+# Usage: create_htmls.pl <VirtualFS> <PicDir> <HtmlDir>
+#
 #
 # Script to create html files with tree frames, side frame where
 # directories are shown, and the main frame where the content of
@@ -14,8 +16,7 @@
 # You can rename a bunch of files with the script renumber.pl...
 #
 # There must be a directory '<whatever>.mini', where the thumbnails are located.
-# They can be created with the script create_thumbs.pl... It is also possible to
-# create these with the command 'makexvpics'.
+# They can be created with the script create_thumbs.pl.
 #
 # Usage example: create_htmls.pl --verbose /Pics /home/system/Pics /var/web/pics
 #          NOTE: Make sure /home/system/Pics.mini contains the thumbnails created
@@ -27,9 +28,11 @@ use FileHandle;
 STDOUT->autoflush(1);
 STDERR->autoflush(1);
 
+use URI::Encode qw(uri_encode);
+
 $verbose        = 0;                                 # Be verbose about actions...
 $DEBUG          = 0;                                 # Output the files list (&get_list())
-$STDERROR       = 0;                                 # Print debuging info?
+$STDERROR       = 1;                                 # Print debuging info?
 
 $config{background1} = ".bkgrnd.gif";                # Side frame background picture...
 $config{background2} = ".pinksilk.gif";              # Main frame background picture...
@@ -51,7 +54,8 @@ $lines_per_page = 8;
 $pics_per_page = $pics_per_line * $lines_per_page;
 
 # Start value...
-$page = "000";
+$base_page_number = "001";
+$page = $base_page_number;
 
 # ----------------------------------------------------
 
@@ -149,11 +153,27 @@ sub check_config {
     }
 }
 
+sub strip_file {
+    local($file) = @_;
+
+    $file =~ s@^/@@;
+    $file =~ s@/$@@;
+
+    $file =~ s@/@_@g;
+    $file =~ s@^_@@;
+    $file =~ s@_$@@;
+    $file =~ s@\ @@g;
+    $file =~ s@,@@g;
+    $file .= "-$page.html";
+
+    return($file);
+}
+
 sub create_index_file {
-    print " Creating $htmldir/index.html... " if($verbose >= 1);
+    print " Creating [index] '$htmldir/index.html'... " if($verbose >= 1);
 
     $OUTPUT = new FileHandle "> $htmldir/index.html";
-    die "Could not open $htmldir/index.html, $!\n" if( !defined $OUTPUT );
+    die "Could not open '$htmldir/index.html', $!\n" if( !defined $OUTPUT );
     $OUTPUT->autoflush(1);
 
     print $OUTPUT <<EOF
@@ -188,21 +208,21 @@ EOF
 
 sub create_side_frame {
     local(@dirlist) = @_;
-    my($i, $printed_ft, $printed_subft, $main_dir, $sub_dir, $file, $htmlfile, $picdir);
-    $page = "000";
+    my($i, $printed_ft, $printed_subft, $main_dir, $sub_dir, $file, $htmlfile, $picdir, $dir_link, $OUTPUT);
+    $page = $base_page_number;
 
-    print " Creating $htmldir/$config{sideframe}... " if($verbose >= 1);
+    print " Creating [sideframe] '$htmldir/$config{sideframe}'... " if($verbose >= 1);
     print "\n" if($verbose >= 2);
 
 
     $OUTPUT = new FileHandle "> $htmldir/$config{sideframe}";
-    die "Could not open $htmldir/$config{sideframe}, $!\n" if( !defined $OUTPUT );
+    die "Could not open '$htmldir/$config{sideframe}', $!\n" if( !defined $OUTPUT );
         $OUTPUT->autoflush(1);
 
 
     # Print the HTML header...
     &header("$htmldir/$config{sideframe}");
-    print $OUTPUT "  <BODY BACKGROUND=$config{background1}>\n";
+    print $OUTPUT "  <BODY BACKGROUND=\"$config{background1}\">\n";
 
 
     # -------------------------------------------
@@ -220,21 +240,32 @@ sub create_side_frame {
 	$file  =~ s@^_@@;
 	$file  =~ s@_$@@;
 	$file  =~ s@_\.@@;
+	$file  =~ s@\ @@g;
+	$file  =~ s@,@@g;
 	$file .=  "-$page.html";
 
 	$output = &get_files_in_dir("$realpicdir/$dirlist[$i]");
 
 	print "  SidePage ($i): $file\t('$realpicdir/$dirlist[$i]')\n" if($DEBUG);
 	
+	$dir_link =  $main_dir;
+	$dir_link =~ s/ - /<br>/g;
+	$dir_link => s/, /<br>/g;
+
 	if( $dirlist[$i+1] ) {
 	    if( ($dirlist[$i+1] !~ /$main_dir/) && ($dirlist[$i-1] !~ /$main_dir/) ) {
-		print "  Adding directory $main_dir... " if($verbose >= 2);
+		print "  Adding directory '$main_dir'... " if($verbose >= 2);
 		print $OUTPUT <<EOF
     <!-- src location 1 -->
-    <img src=$config{check_img}>
-    <a href="$file" target=main
-       onMouseOver="window.status='$output pictures in directory $dirlist[$i].'; return true">$main_dir</a><br>
-
+    <table>
+      <tr>
+        <th><img src="$config{check_img}"></th>
+        <th align="left">
+          <a href="$file" target="main"
+             onMouseOver="window.status='$output pictures in directory $dirlist[$i].'; return true">$dir_link</a>
+        </th>
+      </tr>
+    </table>
 EOF
     ;
 		print "done.\n" if($verbose >= 2);
@@ -242,14 +273,20 @@ EOF
 	} else {
 	    print $OUTPUT <<EOF
     <!-- src location 2 -->
-    <img src=$config{check_img}>
-    <a href="$file" target=main
-       onMouseOver="window.status='$output pictures in directory $main_dir.'; return true">$main_dir</a><br>
+    <table>
+      <tr>
+        <th><img src="$config{check_img}"></th>
+        <th align="left">
+          <a href="$file" target="main"
+             onMouseOver="window.status='$output pictures in directory $main_dir.'; return true">$dir_link</a>
+        </th>
+      </tr>
+    </table>
 EOF
     ;
 	}
+	print $OUTPUT "    <p>\n\n";
     }
-    print $OUTPUT "\n";
 
 
     # -------------------------------------------
@@ -299,7 +336,7 @@ EOF
 
 		if( ($dirlist[$i+1] =~ /$next_dir/) && ($next_dir ne '.') && $printed_subft && $next_sub_dir) {
 		    print $OUTPUT <<EOF
-            <FD><a href="$file" target=main
+            <FD><a href="$file" target="main"
                    onMouseOver="window.status='$output pictures in directory $main_dir.$sub_dir.'; return true">$next_sub_dir</a>
 EOF
     ;
@@ -312,7 +349,7 @@ EOF
 		    
 		    print "  Adding NEXTSUBDIR $next_dir\n" if($DEBUG);
 		    print $OUTPUT <<EOF
-            <fd><a href="$file" target=main
+            <fd><a href="$file" target="main"
                    onMouseOver="window.status='$output pictures in directory $main_dir.$sub_dir.'; return true">$next_sub_dir</a>
 
 EOF
@@ -340,14 +377,14 @@ EOF
 
 		    if( $prev_main_dir ) {
 			print $OUTPUT <<EOF
-              <fD><a href="$file" target=main
+              <fD><a href="$file" target="main"
                      onMouseOver="window.status='$output pictures in directory $sub_dir.'; return true">$sub_dir</a>
 
 EOF
     ;
 		    } else {
 			print $OUTPUT <<EOF
-        <fD><a href="$file" target=main
+        <fD><a href="$file" target="main"
                onMouseOver="window.status='$output pictures in directory $sub_dir.'; return true">$sub_dir</a>
 EOF
     ;
@@ -361,7 +398,7 @@ EOF
 		    
 		    print "  Adding SUBDIR $sub_dir\n" if($DEBUG);
 		    print $OUTPUT <<EOF
-        <Fd><a href="$file" target=main
+        <Fd><a href="$file" target="main"
                onMouseOver="window.status='$output pictures in directory $sub_dir.'; return true">$sub_dir</a>
 
 EOF
@@ -444,15 +481,15 @@ EOF
 }
 
 sub create_change_password {
-    print " Creating $htmldir/$config{changepass}... " if($verbose >= 1);
+    print " Creating [changepass] '$htmldir/$config{changepass}'... " if($verbose >= 1);
 
     $OUTPUT = new FileHandle "> $htmldir/$config{changepass}";
-    die "Could not open $htmldir/$config{changepass}, $!\n" if( !defined $OUTPUT );
+    die "Could not open '$htmldir/$config{changepass}', $!\n" if( !defined $OUTPUT );
         $OUTPUT->autoflush(1);
 
     # Print the HTML header...
     &header();
-    print $OUTPUT "  <BODY BACKGROUND=$config{background1}>\n";
+    print $OUTPUT "  <BODY BACKGROUND=\"$config{background1}\">\n";
 
     print $OUTPUT <<EOF
     <pike>
@@ -564,11 +601,11 @@ EOF
 }
 
 sub create_directory_files {
-    my($j, $file, $counter, $pictures, $dir, $name, $prevdir, $first_table, @files);
+    my($j, $file, $col, $pictures, $dir, $name, $prevdir, $first_table, $newdir, $newfile, @files);
 
     print " Creating directory pages... " if($verbose >= 1);
 
-    $j = 0; $page = "000";
+    $j = 0; $page = $base_page_number;
     if( $virtpicdir && "$virtpicdir.mini" ) {
 	print "Getting file list... " if($verbose >= 2);
 	@files = &get_list("$realpicdir.mini", "files");
@@ -585,32 +622,27 @@ sub create_directory_files {
 		print STDERR "  1: $files[$j] : $files[$j+1]\n" if($STDERROR);
 		$j++;
 	    }
-	    print STDERR "  j = $j ($files[$j])\n" if($STDERROR);
+	    print STDERR "  files[$j]='$files[$j]'\n" if($STDERROR);
 	}
-	
+
 	# Calculate the name of the first HTML file...
-	$basedir = (split(' ', &basename("$virtpicdir/$files[$j]")))[0];
-	$file  =  $basedir;
-	$file  =~ s@/@_@g;
-	$file  =~ s@^_@@;
-	$file  =~ s@_$@@;
-	$file .=  "-$page.html";
+	$file = &strip_file("$virtpicdir/$files[$j]");
 	push(@HTML_FILES, $file);
 
-	# Open the first HTML file...
+	# Open the first (top) HTML file...
 	print STDERR "\n BEGIN: $htmldir/$file\n" if($STDERROR);
 	&open_html_file("$htmldir/$file");
+	print STDERR "\n" if($STDERROR);
 
 	# Go through each file entry...
-	$counter = 1; $pictures = 0; $prevdir = ""; $first_table = 0;
-	for( ; $files[$j]; $j++ ) {
+	$col = 1; $prevdir = ""; $first_table = 0;
+	for($j = 1 ; $files[$j]; $j++ ) {
 	    # Do we have an entry (keep perl happy)?
 	    if( $files[$j] ) {
-		printf(STDERR "\n FILES (%5s): $files[$j]\n", $j) if($STDERROR);
+		printf(STDERR " FILES (%5s): $files[$j]\n", $j) if($STDERROR);
 
 		# Get the filename from the list...
-		($dir, $file) = split(' ', &basename($files[$j]));
-		$dir =~ s/\/$//;
+		($basedir, $file) = &basename($files[$j]);
 		
 		# Remove the extension...
 		$file = (split('\.', $file))[0];
@@ -621,6 +653,40 @@ sub create_directory_files {
 		
 		# ---
 		
+		print STDERR " prev: '$prevdir'; base: '$basedir'; files[$j]: '$files[$j]'\n\n" if($STDERROR);
+		if( $files[$j] =~ /\/$/ ) {
+		    # We have a new directory...
+		    print STDERR "\n <-- new dir (files[$j]='$files[$j]') -->\n" if($STDERROR);
+		    
+		    $pictures = 0; $col = 1; $page = $base_page_number;
+
+		    # Print the TABLE footer...
+		    &table_end();
+	
+		    # Print the HTML footer...
+		    &footer();
+
+		    # Close file...
+		    $OUTPUT->close;
+
+
+		    # Reopen the HTML file with the next number...
+		    $file = &strip_file("$virtpicdir/" . (&basename($files[$j]))[0]);
+		    push(@HTML_FILES, $file);
+
+		    &open_html_file("$htmldir/$file");
+		    print STDERR "\n" if($STDERROR);
+
+		    $first_table = 0;
+
+		    # TODO: Not quite sure why it needs to be '0' here, but if it's '1', then
+		    # the very first column will start at '2'!???!! Weird..
+		    # Weirder: But this is only on anything but the first file!
+		    $col = 0;
+		}
+
+		# ---
+
 		# If this is the first image, we start the table here...
 		if(! $first_table ) {
 		    # Print the first table start...
@@ -628,17 +694,20 @@ sub create_directory_files {
 		    print $OUTPUT <<EOF;
 
     <TABLE>
-      <TD WIDTH="500" VALIGN=top>
-        <OBOX ALIGN=LEFT WIDTH=480>
-          <TITLE>$basedir</TITLE>
-          <TABLE>
+      <TR ALIGN="center">
+        <TD>
+          <H1>$basedir</H1>
+        <TD>
+      </TR>
+      <TR>
+        <TD WIDTH="500" VALIGN="top">
+          <OBOX ALIGN="LEFT" WIDTH="480">
+            <TITLE>$basedir</TITLE>
+            <TABLE>
+              <TR>
 EOF
     ;
 		    $first_table = 1;
-		} else {
-		    if( $counter == 1 ) {
-			&table_start();
-		    }
 		}
 		
 		if( $file =~ /\_/ ) {
@@ -649,69 +718,63 @@ EOF
 
 		# Calculate the name of the _NEXT_ HTML file...
 		if($files[$j+1]) {
-		    $basedir = (split(' ', &basename("$virtpicdir/$files[$j+1]")))[0];
-		    $next  =  $basedir;
-		    $next  =~ s@/@_@g;
-		    $next  =~ s@^_@@;
-		    $next  =~ s@_$@@;
-		    $next .=  "-$page.html";
+		    $basedir = (&basename("$virtpicdir/$files[$j+1]"))[0];
+		    $next = &strip_file($basedir);
 		} else {
 		    $next  = $file;
 		}
 
 		# Print the image...
-#		if( $files[$j] =~ /\_[0-9][0-9]/ ) {
+		if( $files[$j] !~ /\/$/ ) {
 		    $size = `ls -l "$realpicdir/$files[$j]"`;
 		    $size = (split(' ', $size))[4];
 
-		    print $OUTPUT <<EOF;
-            <!--- Row no $counter. Picture no: $pictures -->
-            <TD WIDTH="100">
-              <CENTER>
-                <A HREF=\"$virtpicdir/$files[$j]\"
-                   onMouseOver="window.status='File $files[$j] is $size bytes large. Shift-LMB downloads file'; return true"
-                   onClick="viewLink('$virtpicdir/$files[$j]', '$file', '$virtpicdir/$files[$j+1]', event)" target=main>
-                  <IMG SRC=\"$virtpicdir.mini/$files[$j]\" ALT="$file" BORDER=0><BR>$name
-                </A>
-              </CENTER>
-            </TD>
+		    my $uri_this = uri_encode("$virtpicdir/$files[$j]");
 
+		    my $uri_next = uri_encode("$virtpicdir/$files[$j+1]");
+		    $file_next = (&basename($files[$j+1]))[1];
+		    $name_next = (split('\.', $file_next))[0];
+
+		    print $OUTPUT <<EOF;
+                <!--- Column no $col. Picture no: $pictures -->
+                <TD WIDTH="100%">
+                  <CENTER>
+                    <IMG SRC=\"$virtpicdir.mini/$files[$j]\" ALT="$file" BORDER="0"
+                         onClick="viewLink('$uri_this', '$file', '$uri_next', '$name_next', event)"
+                         target="main"><BR>$name
+                  </CENTER>
+                </TD>
 EOF
     ;
-#		}
+		}
 		
 		# A maximum of X pictures in a line...
-		if( ($counter == $pics_per_line) && ($pictures < ($pics_per_page - 1)) ) {
+		if( ($col == ($pics_per_line - 1)) && ($pictures < ($pics_per_page - 1)) ) {
 		    print $OUTPUT <<EOF
-          </TABLE>
-        </TD>
-      </TABLE>
+              </TR>
+
+              <TR>
 EOF
     ;
-		    $counter = 1;
+		    $col = 1;
 		} else { 
-		    $counter++;
+		    print $OUTPUT "\n";
+		    $col++;
 		}
 		
 		# Calculate the file name for the HTML file...
 		if( $files[$j+1] ) {
-		    $basedir = (split(' ', &basename("$virtpicdir/$files[$j+1]")))[0];
+		    $basedir = (&basename("$virtpicdir/$files[$j+1]"))[0];
 		} else {
-		    $basedir = (split(' ', &basename("$virtpicdir/")))[0];
+		    $basedir = (&basename("$virtpicdir/"))[0];
 		}
-
-		$file  =  $basedir;
-		$file  =~ s@/@_@g;
-		$file  =~ s@^_@@;
-		$file  =~ s@_$@@;
+		$file = &strip_file($basedir);
 
 		# A maximum of 40 pictures on one page...
 		# <IMG SRC=\"$virtpicdir.mini/$files[$j]\" ALT="$file" BORDER=0><BR>$name
 
 		if( $pictures >= ($pics_per_page - 1) ) {
-		    print "DONE.\n" if($verbose >= 2);
-		    
-		    $pictures = 0; $counter = 1; $page++;
+		    $pictures = 0; $col = 1; $page++;
 		    $file .= "-$page.html";
 		    
 		    # Add a link to the next HTML file...
@@ -780,77 +843,20 @@ EOF
 		}
 
 		last if(!$files[$j+1]);
-#		if( $files[$j+1] ) {
-#		    while($files[$j+1] !~ /_[0-9][0-9]/) {
-#			last if(! $files[$j]);
-#			print STDERR " 2: $files[$j] : $files[$j+1]\n" if($STDERROR);
-#			$j++;
-#		    }
-#		    print STDERR " j = $j ($files[$j])\n" if($STDERROR);
-#		} else {
-#		    last;
-#		}
-		
-		# Calculate the file name for the HTML file...
-		$basedir = (split(' ', &basename("$virtpicdir/$files[$j+1]")))[0];
-		$file  =  $basedir;
-		$file  =~ s@/@_@g;
-		$file  =~ s@^_@@;
-		$file  =~ s@_$@@;
-
-		print STDERR "\n prev: $prevdir - base: $basedir ($files[$j])\n" if($STDERROR);
-		if( ($files[$j] =~ /\/$/) || ($prevdir ne $basedir) ) {
-		    # We have a new directory...
-		    print STDERR " <-- new dir -->\n" if($STDERROR);
-		    print "done.\n" if($verbose >= 2);
-		    
-		    $pictures = 0; $counter = 1; $page = "000";
-		    $file .=  "-$page.html";
-		    
-		    print $OUTPUT <<EOF
-          </TABLE>
-        </OBOX>
-      </TD>
-    </TABLE>
-EOF
-    ;
-		    
-		    # Print the HTML footer...
-		    &footer();
-		    
-		    # Reopen the HTML file with the next number...
-#		    $OUTPUT->close;
-#		    push(@HTML_FILES, $file);
-#		    &open_html_file("$htmldir/$file");
-
-		    $first_table = 0; 
-		} else {
-		    $file .=  "-$page.html";
-		}
 
 		$prevdir = $basedir;
 	    } # if($files[$j])
 	} # for(;$files[$j];$j++) 
-	
-	print $OUTPUT <<EOF
-          </TABLE>
-        </OBOX>
-      </TD>
-    </TABLE>
-EOF
-    ;
-#	# Print the TABLE footer...
-#	&table_end();
+
+	# Print the TABLE footer...
+	&table_end();
 	
 	# Print the HTML footer...
 	&footer();
 
 	$OUTPUT->close;
-
-	print "done.\n" if($verbose >= 2 );
+	print "done.\n" if($verbose >= 1);
     }
-
-    print "done.\n" if($verbose >= 1);
 }
 
 sub create_link {
@@ -859,50 +865,64 @@ sub create_link {
     $tmp =  $virtpicdir;
     $tmp =~ s/^\///;
 
-    system("cd $htmldir && rm -f *.html $tmp $tmp.mini");
-    system("cd $htmldir && rm -f $tmp $tmp.mini");
+    if( -e "$htmldir" ) {
+	print "Cleaning up '$htmldir'... " if($verbose >= 1);
+	system("cd '$htmldir' && rm -f *.html $tmp $tmp.mini");
+	system("cd '$htmldir' && rm -f $tmp $tmp.mini");
+	print "done.\n" if($verbose >= 1);
 
-#    print "Creating program links... " if($verbose >= 1);
-#    system("cd $htmldir && ln -sf $realpicdir $tmp");
-#    system("cd $htmldir && ln -sf $realpicdir.mini $tmp.mini");
+#	print "Creating program links... " if($verbose >= 1);
+#	system("cd '$htmldir' && ln -sf $realpicdir $tmp");
+#	system("cd '$htmldir' && ln -sf $realpicdir.mini $tmp.mini");
 #
-#    system("cd $htmldir && ln -sf ~/bin/create_htmls.pl create_htmls.pl");
-#    system("cd $htmldir && ln -sf ~/bin/renumber.pl renumber.pl");
-#    system("cd $htmldir && ln -sf ~/bin/create_thumbs.pl create_thumbs.pl");
-#    print "done.\n" if($verbose >= 1);
+#	system("cd '$htmldir' && ln -sf ~/bin/create_htmls.pl create_htmls.pl");
+#	system("cd '$htmldir' && ln -sf ~/bin/renumber.pl renumber.pl");
+#	system("cd '$htmldir' && ln -sf ~/bin/create_thumbs.pl create_thumbs.pl");
+#	print "done.\n" if($verbose >= 1);
 #
-#    print "Converting perlscripts to html ... " if($verbose >= 1);
-#    system("cd $htmldir && code2html.pl perl create_htmls.pl create_htmls.html");
-#    system("cd $htmldir && code2html.pl perl renumber.pl renumber.html");
-#    system("cd $htmldir && code2html.pl perl create_thumbs.pl create_thumbs.html");
-#    print "done.\n" if($verbose >= 1);
+#	print "Converting perlscripts to html ... " if($verbose >= 1);
+#	system("cd '$htmldir' && code2html.pl perl create_htmls.pl create_htmls.html");
+#	system("cd '$htmldir' && code2html.pl perl renumber.pl renumber.html");
+#	system("cd '$htmldir' && code2html.pl perl create_thumbs.pl create_thumbs.html");
+#	print "done.\n" if($verbose >= 1);
+    } else {
+	mkdir("$htmldir", 0755);
+    }
 }
 
 # ----------------------------------------------------
 
 sub get_list {
     local($dir, $type) = @_;
-    my(@DIRS, @TMP, $LINE, $directory, $i);
+    my(%DIRS, @TMP, $LINE, $directory, $i);
 
     # Check to see if the directory exists...
     if( -e "$dir" ) {
 	# Open the directory...
 	if( $type eq 'dirs' ) {
-	    open(LIST, "cd \"$dir\" \&\& /usr/bin/find -type d |");
+	    open(LIST, "cd '$dir' \&\& /usr/bin/find -type d |");
 	} else {
-	    $dir_name    = `basename $dir`; chomp($dir_name);
-	    open(LIST, "cd \"$dir/..\" \&\& /usr/bin/find $dir_name -type f |");
+#	    print "DEBUG: dir='$dir'\n";
+	    $dir_name    = (&basename($dir))[0];
+
+#	    print "DEBUG: cd '$dir/..' && /usr/bin/find '$dir_name' -type f\n";
+#	    open(LIST, "cd '$dir/..' \&\& /usr/bin/find '$dir_name' -type f |");
+
+#	    print "DEBUG: cd '$dir' && /usr/bin/find -type f\n";
+	    open(LIST, "cd '$dir' \&\& /usr/bin/find -type f |");
 	}
 
+	print "\n" if( $DEBUG );
 	while(! eof(LIST) ) {
 	    $LINE = <LIST>;
 	    chomp($LINE);
 
 	    next if( $LINE =~ /xvpics/ );
+
 	    $LINE =~ s@\./@@;
 	    $LINE =~ s@$dir_name/@@;
 
-	    print "input:   $LINE\n" if( $DEBUG );
+	    print "  input:   $LINE\n" if( $DEBUG );
 	    push(@TMP, $LINE);
 	}
 	close(LIST);
@@ -914,22 +934,22 @@ sub get_list {
     # Prepare a sort of the list...
     for($i = 0; $TMP[$i]; $i++ ) {
 	$DIRS{$TMP[$i]} = "$TMP[$i]";
-	print "prepare: $DIRS{$TMP[$i]}\n" if( $DEBUG );
+	print "  prepare: $DIRS{$TMP[$i]}\n" if( $DEBUG );
     }
     
-    $i = 0;
+    
+    undef @TMP;
     foreach $directory (sort(keys %DIRS)) {
 	if( $type eq 'files' ) {
-	    # The actual directory must before the real file...
-	    if( $directory =~ /_001/ ) {
-		$TMP[$i] = (split('/', $DIRS{$directory}))[0];
-		$i++;
+	    # The actual directory must be before the real file...
+	    if( $directory =~ / - 001/ ) {
+#		printf "DEBUG: DIRS{$directory}='$DIRS{$directory}' (" . (split('/', $DIRS{$directory}))[0] . ")\n";
+		push(@TMP, (split('/', $DIRS{$directory}))[0] . '/');
 	    }
 	}
-	$TMP[$i] = "$DIRS{$directory}";
+	push(@TMP, $DIRS{$directory});
 	
-	print "sorted:  $TMP[$i]\n" if( $DEBUG );
-	$i++;
+	print "  sorted:  $DIRS{$directory}\n" if( $DEBUG );
     }
 
     return(@TMP);
@@ -953,38 +973,45 @@ sub get_files_in_dir {
 
 sub basename {
     my($line) = @_;
-    my(@path, $dir, $i, $file);
+    my(@path, @result, $dir, $i, $file);
 
-    #print "LINE: $line\n";
+    $line =~ s@//@/@g;
+
+#    print "LINE: $line\n";
     @path = split('/', $line);
 
-    for( $i = 0; $path[$i+1]; $i++ ) {
+    for($i = 0; $path[$i+1]; $i++) {
+#	print "path[$i]: '$path[$i]'\n";
 	$dir .= $path[$i];
 
 	if( $path[$i+1] ) {
 	    $dir .= "/";
 	}
     }
+#    print "path[$i]: '$path[$i]'\n";
     $file = $path[$i];
 
     # We have path and a file name...
-    #print "$dir : $file\n";
+#    print "$dir : $file\n";
 
     $dir  =  "$line"  if(! $dir );
     $file =  "$line)" if(! $file );
 
     $dir  =~ s@_$@@;
 
-    return( "$dir $file" );
+    push @result, $dir;
+    push @result, $file;
+
+    return(@result);
 }
 
 sub open_html_file {
     local($file) = @_;
 
-    print " Creating $file... " if($verbose >= 2);
+    print " Creating [html] $file... " if($verbose >= 2);
 
     $OUTPUT = new FileHandle "> $file";
-    die "Could not open $file, $!\n" if( !defined $OUTPUT );
+    die "Could not open '$file', $!\n" if( !defined $OUTPUT );
     $OUTPUT->autoflush(1);
 
     # Print the HTML header...
@@ -1045,20 +1072,12 @@ EOF
     ;
 }
 
-sub table_start {
-    print $OUTPUT <<EOF;
-
-      <TABLE>
-        <TD WIDTH="500" VALIGN=top>
-          <TABLE>
-EOF
-    ;
-}
-
 sub table_end {
     print $OUTPUT <<EOF;
-        </TABLE>
-      </TD>
+              </TR>
+          </TABLE>
+        </TD>
+      </TR>
     </TABLE>
 EOF
     ;
@@ -1071,29 +1090,38 @@ sub javascript {
 
     print $OUTPUT <<EOF;
   <SCRIPT LANGUAGE="javascript">
-  function viewLink(file, name, next, evnt) {
+  function viewLink(file, name, next, name_next, evnt) {
     var body="BODY BACKGROUND=$config{background2}"
   
     if (! evnt.modifiers ) {
       document.open("text/html");
-  
       document.writeln("<" + body + ">");
 
-      document.write('<TABLE>\\n  <TR>\\n    <TD ALIGN="left" WIDTH="96%">\\n');
+      // Table start
+      document.write('<TABLE>\\n');
+      document.write('  <TR>\\n');
 
       // Left link
-      document.write('      <A HREF=$file>Back</A>');
-      document.write('    </TD>\\n\\n    <TD ALIGN="right">\\n');
+      document.write('    <TD ALIGN="left" WIDTH="100%">\\n');
+      document.write("      <A HREF=$file>Back</A>");
+      document.write('    </TD>\\n\\n');
 
-      // Right link
-      document.write('      <A HREF=$file>Back</A>');
-      // document.writeln("<A HREF=" + next + '>Next</A>');
+// Just can't get these to work. I get the 'next' picture alone, not as a HTML pages (with more back/next links).
+//      // Right link
+//      document.write('    <TD ALIGN="right" WIDTH="100%">\\n');
+//      document.write('      <A HREF=' + next + '>Next</A>');
+//      document.write('    </TD>\\n');
 
-      document.write('    </TD>\\n  <TR>\\n</TABLE>\\n\\n');
+      // Table end
+      document.write('  </TR>\\n');
+      document.write('</TABLE>\\n\\n');
 
       // Bottom part of picture page
-      document.writeln("<CENTER>\\n  <H2>", name, "</H2>\\n");
-      document.writeln("  <IMG SRC=" + file + "><P>\\n");
+      document.write('<CENTER>\\n');
+      document.write('  <H2>' + name + '</H2>\\n');
+      document.write('  <IMG SRC="' + file + '" WIDTH="100%" HEIGHT="100%"><P>\\n');
+//      document.write('  <IMG SRC="' + file + '" WIDTH="100%" HEIGHT="100%"');
+//      document.write('       onClick="viewLink(' + next + ', ' + name_next + ', uri_next_next, name_next_next, event)"><P>\\n');
       // document.write('  <B>Here we could add some commersial banners etc...</B><P>\\n');
       document.write('</CENTER>\\n');
   
@@ -1104,7 +1132,7 @@ sub javascript {
 
 EOF
 
-    print $OUTPUT "  <BODY BACKGROUND=$config{background2}>";
+    print $OUTPUT "  <BODY BACKGROUND=\"$config{background2}\">";
     ;
 }
 
