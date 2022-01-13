@@ -40,9 +40,6 @@ if( $ARGV[0] ) {
 sub main {
     local($DIR) = @_;
 
-    $update = 1;
-    $new_files_opened = 0;
-
     # Make sure the 'mini' directory exists...
     printf("Minidir: '$DIR.mini'\n") if( $DEBUG );
     if(! -e "\"$DIR.mini\"" ) {
@@ -50,119 +47,24 @@ sub main {
 	mkdir("$DIR.mini", 0755);
     }
 
-    # Make sure the thumnail directory exists...
-    if( -e "$DIR/.xvpics" ) {
-	open(FIND, "cd \"$DIR\"; /usr/bin/find -name .xvpics \| /usr/bin/xargs /usr/bin/find |")
-	    || die "Could not find..., $!\n";
+    open(LIST, "find '$DIR' -maxdepth 1 -type f \| sort |");
+    while(! eof(LIST) ) {
+	$path = <LIST>;
+	chomp($path);
 
-	if( open(NEWFILES, ">/tmp/view_new_files.sh") ) {
-	    $new_files_opened = 1;
-	    chmod( 0755, "/tmp/view_new_files.sh" );
-	    printf(NEWFILES "#!/bin/sh\n\n");
-	}
+	($dir, $file) = &basename($path);
 
-	print NEWFILES "\ncd \"$DIR\"\nxv ";
-
-	while(! eof(FIND) ) {
-	    $LINE = <FIND>;
-
-	    if( $LINE ) {
-		chomp($LINE);
-
-		if( $LINE ) {
-		    # Get the filename from the list...
-		    ($dir, $file) = split(' ', &basename($LINE));
-
-		    $dir =~ s/$DIR//;
-		    $dir =~ s/^\///;
-		    $dir =~ s@./@@;
-
-		    # Remove the extension...
-		    $FILE = $file;
-		    ($file, $ext) = split('\.', $FILE);
-
-		    next if(! $file);
-		    next if(! $ext);
-
-		    $ext = lc($ext);
-		    if( $ext eq 'jpg' || $ext eq 'gif' ) {
-			$check = "$DIR.mini/$dir/$file.$ext";
-
-			# Does the thumbnail exists?
-			printf("Checking file '$check'\n") if( $DEBUG );
-			if(! -e "$check" ) {
-			    printf("Creating:   $check\n");
-			    print NEWFILES "\"$dir/$file.$ext\" ";
-
-			    # Create the shell script...
-			    open(TEMP_FILE, ">/tmp/file.sh");
-			    print TEMP_FILE <<EOF;
-#!/bin/sh
-
-TMPFILE=`mktemp -q /tmp/thumnail.XXXXXX`
-
-# Create a PPM file...
-#cat \"$DIR/$dir/.xvpics/$FILE\" | xvpictoppm > \$TMPFILE.ppm
-cat \"$DIR/$dir/.xvpics/$FILE\" | xvminitoppm > \$TMPFILE.ppm
-
-mkdir -p \"$DIR.mini/$dir\"
-
-# Create a progressive JPEG file...
-convert -interlace Plane \$TMPFILE.ppm \"$check\"
-
-# Clean up..
-rm -f \$TMPFILE.ppm \$TMPFILE
-EOF
-    ;
-			    close(TEMP_FILE);
-			
-			    # Make the shell script executable...
-			    chmod( 0755, "/tmp/file.sh" );
-
-			    # Convert the file...
-			    system("/tmp/file.sh");
-
-			    # Remove the shell script...
-			    unlink("/tmp/file.sh") if( !$DEBUG );
-			} else {
-			    # Does the thumbnail exists, but not the original?
-			    printf("Checking file '$DIR/$dir/$file.$ext'\n") if( $DEBUG );
-			    if(! -e "$DIR/$dir/$file.$ext" ) {
-				print STDERR "Thumbnail $check exists,\n  but not original ($DIR/$dir/$file.$ext).\n\n";
-				system("rm -i \"$check\"");
-			    } else {
-				printf("File $file.$ext exists...\n") if( $DEBUG );
-			    }
-			}
-		    } elsif( $ext eq 'avi' || $ext eq 'mov' || $ext eq 'mpg' || $ext eq 'viv' || $ext eq 'qt' || $ext eq 'rm' ) {
-			$check = "$DIR.mini/$dir/$file.$ext";
-
-			if(! -e $check ) {
-			    # Movies, default icon...
-			    printf("File:   $check\n") if( $DEBUG );
-			    system("mkdir -p \"$DIR.mini/$dir\"");
-			    system("cp ~/.movie.jpg $check");
-			}
-		    }
-		}
-	    }
-	}
-    } else {
-	# Does not exists...
-	&header();
-
-    print <<EOF;
-<PRE>
-  <CENTER>
-There are no thumnails in the directory $DIR
-Please run the xv-visual schnauzer to create some...
-  </CENTER>
-</PRE>
-</BODY>
-</HTML>
-EOF
-    ;
+	printf "Creating thumbnail '$DIR.mini/$file': ";
+	&convert("$dir/$file", "$DIR.mini/$file");
+	printf "done.\n";
     }
+}
+
+sub convert {
+    local($source, $dest) = @_;
+
+    # Convert the file...
+    system("convert -auto-orient -thumbnail 200x200 '$source' '$dest'");
 }
 
 sub index {
@@ -174,7 +76,7 @@ sub index {
 	print "Finding in dir: $DIR\n";
 
 	# Open the directory...
-	open(LIST, "/usr/bin/find $DIR -mindepth 1 -type d |") 
+	open(LIST, "/usr/bin/find '$DIR' -mindepth 1 -type d |") 
 	    || die "Could not find, $!\n";
 	while(! eof(LIST) ) {
 	    $LINE = <LIST>;
@@ -219,27 +121,29 @@ EOF
 
 sub basename {
     my($line) = @_;
-    my(@path, $dir, $i, $file);
+    my(@path, @result, $dir, $i, $file);
 
 #    print "LINE: $line\n";
     @path = split('/', $line);
 
-    for( $i = 0; $path[$i+1]; $i++ ) {
+    for($i = 0; $path[$i+1]; $i++) {
+#	print "path[$i]: '$path[$i]'\n";
 	$dir .= $path[$i];
 
-	if( $path[$i+1] ) {
+	if( $path[$i+2] ) {
 	    $dir .= "/";
 	}
     }
+#    print "path[$i]: '$path[$i]'\n";
     $file = $path[$i];
-
-    # Remove the '/.xvpics/' at the end...
-    $dir =~ s/\/\.xvpics\/$// if($update);
 
     # We have path and a file name...
 #    print "$dir : $file\n";
 
-    return( "$dir $file" );
+    push @result, $dir;
+    push @result, $file;
+
+    return(@result);
 }
 
 sub header {
