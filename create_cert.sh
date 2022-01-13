@@ -109,7 +109,8 @@ if [ -f "server.pubkey" ]; then
 
 	echo "Moving files to cert database directory:"
 	[ ! -d "$BASE_DIR/certs/" ] && mkdir -p $BASE_DIR/certs
-	cp -v $FILENAME.pem $FILENAME.prv $FILENAME.prv-gnutls $FILENAME.pub $BASE_DIR/certs/
+	cp -v $FILENAME.pem $FILENAME.prv $FILENAME.prv-gnutls $FILENAME.pub \
+	    $BASE_DIR/CA/certs/
 	if [ "$?" = "0" ]; then
 	    cd /
 	    rm -Rf $TMPDIR
