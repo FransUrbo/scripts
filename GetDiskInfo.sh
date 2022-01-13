@@ -357,7 +357,7 @@ lspci -D > $PCI_DEVS
 					    # SOMETHING is connected here, but we can't figure out what..
 					    # This happened to me when the SAS chain kicked a disk.
 					    # => Simulate 'empty port'.
-					    host=$(echo $path | sed 's@.*/phy-\([0-9]\+\):\([0-9]\+\)/.*@host\1:\2@')
+					    host=$(echo $path | sed 's@.*/phy-\([0-9]\+\):\([0-9]\+\)/.*@host\1:\2@' | head -n1)
 					    [ "$DO_MACHINE_READABLE" == 0 ] && printf "  %-15s\n" $host
 
 					    continue
@@ -365,7 +365,7 @@ lspci -D > $PCI_DEVS
 
 					# rev='/sys/devices/pci0000:00/0000:00:02.0/0000:01:00.0/host0/phy-0:0/sas_phy/phy-0:0/device/port/end_device-0:0/target0:0:0/0:0:0:0/rev'
 
-					host=$(echo "$rev" | sed 's@.*/phy-\([0-9]\+\):\([0-9]\+\)/.*@host\1:\2@')
+					host=$(echo "$rev" | sed 's@.*/phy-\([0-9]\+\):\([0-9]\+\)/.*@host\1:\2@' | head -n1)
 
 					t=${rev%/*} # remove file part
 					t_id=${t##*/}
@@ -483,7 +483,8 @@ lspci -D > $PCI_DEVS
 				    device_id=$(/bin/ls -l /dev/disk/by-id/ | \
 					grep -E "/$name$" | \
 					sed -e "s@.*usb-\(.*\) -.*@\1@" \
-					    -e "s@.*ata-\(.*\) -.*@\1@")
+					    -e "s@.*ata-\(.*\) -.*@\1@" | \
+					head -n1)
 				fi
 
 				# ----------------------
