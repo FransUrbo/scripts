@@ -13,7 +13,7 @@ if( $#ARGV >= 0 ) {
 	if( $arg eq '--help' || $arg eq '-h' || $arg eq '?' ) {
 	    &help();
 	} elsif( $arg =~ /^[a-zA-Z]/ ) {
-	    $prefix = "$arg\_";
+	    $prefix = "$arg - ";
 	} elsif( $arg =~ /^[0-9]/ ) {
 	    $start = $arg;
 	} elsif( $arg =~ /^\// | $arg =~ /^\./ ) {
@@ -28,15 +28,22 @@ exit(1) if(! $DEST);
 
 # -------------------------
 
-open(LIST, "find -type f -maxdepth 1 \| sort |");
+open(LIST, "find . -maxdepth 1 -type f \| sort |");
 while(! eof(LIST) ) {
-    $file = <LIST>;
-    chomp($file);
-    @entry = split(/\//, $file);
+    $path = <LIST>;
+    chomp($path);
+    @entry = split(/\//, $path);
+
+    # Get filename...
+    $file = $entry[length(@entry)];
 
     # Get the extension...
-    $EXT = (split('\.', $entry[1]))[1];
+    @TMP = split('\.', $file);
+    $len = scalar(@TMP);
+    $EXT = $TMP[$len-1];
     $EXT = lc($EXT);
+
+    $EXT = 'jpg' if($EXT =~ /jpeg/);
 
     &find_free_number() if(! $found_free_number);
 
@@ -70,11 +77,11 @@ sub find_free_number {
 
 sub help {
     print "usage:   renumber.pl <destination> [prefix] [start_no]\n";
-    print "         Moves all files to <destination>/[prefix]_[startno].extension\n\n";
+    print "         Moves all files to <destination>/[prefix] - [startno].extension\n\n";
 
     print "example: renumber.pl /tmp/files Pictures 001\n";
-    print "         The first file will be called:  /tmp/files/Pictures_001(extension)\n";
-    print "         The second file will be called: /tmp/files/Pictures_002(extension)\n";
+    print "         The first file will be called:  /tmp/files/Pictures - 001.extension\n";
+    print "         The second file will be called: /tmp/files/Pictures - 002.extension\n";
     print "         etcetera...\n";
     exit( 0 );
 }
